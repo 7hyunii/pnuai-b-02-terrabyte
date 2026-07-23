@@ -1258,6 +1258,7 @@ function Analysis({ compact, deviceId, onNavigate, selectedCrop, setSelectedCrop
         scoreData={analysisScore}
         visible={analysisFormulaOpen}
       />
+      
       <Surface style={styles.reportSection}>
         <View style={styles.reportSectionHeading}>
           <Text style={styles.reportSectionNumber}>01</Text>
