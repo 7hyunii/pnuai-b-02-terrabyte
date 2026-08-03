@@ -230,6 +230,14 @@ export const shopProducts: ShopProduct[] = [
     price: 8900,
   },
   {
+    id: 'vermiculite',
+    category: 'soil',
+    name: '버미큘라이트 3L',
+    emoji: '🟤',
+    desc: '수분·양분 보유력을 높여 건조가 빠른 배지를 보완하는 토양 개량재',
+    price: 7900,
+  },
+  {
     id: 'basil-seeds',
     category: 'seeds',
     name: '바질 씨앗',
@@ -295,13 +303,6 @@ export const equipment = [
     source: '맞춤 추천',
   },
 ];
-
-export const soil = {
-  title: '배수 좋은 상토 + 펄라이트 2:1 배합',
-  reason: '토양수분이 최적 범위에 있어요.',
-  body: '토양수분이 최적 범위에 있어요. 현재 배합을 유지하면 과습 없이 뿌리가 건강하게 자랄 수 있어요.',
-  disclaimer: '추천 로직·API 스펙 확정 전 예시 데이터입니다',
-};
 
 export const dailyAvg = [
   { label: '온도', emoji: '🌡️', value: '24.1℃', sub: '24h 평균 · 최저 21.8 · 최고 26.3' },
