@@ -34,19 +34,9 @@ export INFLUX_BUCKET='telemetry'
 export TELEMETRY_DEVICE_KEY='하드웨어가 X-Device-Key로 보낼 공유 키'
 ```
 
-기존 SQLite 점수 스키마를 최초 한 번 적용합니다.
-
-```bash
-sqlite3 db/terrabyte-score.db < db/schema.sql
-```
-
-이미 v2 경계 프로필까지 적용된 DB에는 점수 모델 마이그레이션을 추가로 실행합니다.
-
-```bash
-sqlite3 db/terrabyte-score.db < db/migrations/2026-07-25_score_model_config_v1.sql
-```
-
-이 마이그레이션은 반복 실행해도 동일한 상태를 유지합니다.
+SQLite 점수 스키마와 마이그레이션은 애플리케이션이 시작될 때 자동으로 적용됩니다.
+DB 파일이 비어 있으면 전체 스키마를 생성하고, 이미 존재하면 마이그레이션만 실행합니다.
+수동으로 `sqlite3` 명령을 실행할 필요가 없습니다.
 
 애플리케이션을 실행합니다.
 

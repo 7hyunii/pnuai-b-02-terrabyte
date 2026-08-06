@@ -34,6 +34,22 @@ dependencies {
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+
+
+tasks.register('prepareSqliteResources', Copy) {
+	from('db') {
+		include '*.sql'
+		include 'migrations/*.sql'
+	}
+	into layout.buildDirectory.dir('generated-resources/db/sqlite')
+}
+
+tasks.named('processResources') {
+	dependsOn 'prepareSqliteResources'
+}
+
+sourceSets.main.resources.srcDir layout.buildDirectory.dir('generated-resources')
+
 tasks.named('test') {
 	useJUnitPlatform()
 }
