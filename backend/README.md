@@ -197,6 +197,18 @@ cd backend
 ./gradlew test
 ```
 
+## Swagger API 문서
+
+백엔드 실행 후 아래 주소에서 API 명세를 확인하고 요청을 직접 테스트할 수 있습니다.
+
+| 구분 | 주소 |
+| --- | --- |
+| Swagger UI | `http://localhost:8080/swagger-ui.html` |
+| OpenAPI JSON | `http://localhost:8080/v3/api-docs` |
+| OpenAPI YAML | `http://localhost:8080/v3/api-docs.yaml` |
+
+인증이 필요한 API는 Swagger UI 우측 상단의 **Authorize**에서 로그인 또는 회원가입 응답으로 받은 액세스 토큰을 입력한 뒤 테스트합니다.
+
 ## 인증 API
 
 ```text
