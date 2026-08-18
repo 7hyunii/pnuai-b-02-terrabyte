@@ -49,6 +49,7 @@ const mockMeasurements: LatestMeasurements = {
     airTemperatureC: 24.6,
     airHumidityPct: 46,
     plantLightPpfdUmolM2S: 80,
+    soilTemperatureC: null,
   },
   quality: {
     soilSensorValid: true,
@@ -65,7 +66,7 @@ const meta = {
   },
   render: (args) => (
     <DeviceEnvironmentProvider
-      deviceId={1}
+      potId={1}
       fetchMeasurements={async () => mockMeasurements}
       fetchScore={async () => mockScore}
     >
