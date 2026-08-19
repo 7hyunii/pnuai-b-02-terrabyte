@@ -3,6 +3,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { font } from '../appTheme/glass';
 import { palette } from '../appTheme/palette';
 import { scaleTypography } from '../appTheme/scaleTypography';
+import { typeScale } from '../appTheme/typography';
 import type { EnvironmentScore } from '../measurement/measurementApi';
 import { Surface } from './Surface';
 
@@ -19,7 +20,6 @@ export function SuitabilityFormulaModal({ onClose, scoreData, visible }: Suitabi
         <Surface style={styles.formulaModal}>
           <View style={styles.modalHeader}>
             <View style={styles.modalHeaderCopy}>
-              <Text style={styles.modalEyebrow}>SUITABILITY FORMULA</Text>
               <Text style={styles.modalTitle}>적합도 계산식</Text>
               <Text style={styles.modalDescription}>온도·습도·PPFD 세 가지 환경값만 사용합니다.</Text>
             </View>
@@ -55,12 +55,12 @@ export function SuitabilityFormulaModal({ onClose, scoreData, visible }: Suitabi
                 <Text style={styles.formulaExpression}>100 × (T/100)¹⁄³ × (H/100)¹⁄³ × (L/100)¹⁄³</Text>
                 <Text style={styles.formulaEquivalentExpression}>= (T × H × L)¹⁄³</Text>
               </View>
-              <Text style={styles.formulaBody}>T = 온도 점수 · H = 습도 점수 · L = PPFD 광량 점수</Text>
+              <Text style={styles.formulaBody}>T = 온도 점수 · H = 습도 점수 · L = PPFD 조도 점수</Text>
             </View>
 
             <View style={styles.formulaNotice}>
               <Text style={styles.formulaNoticeTitle}>점수 제외 항목</Text>
-              <Text style={styles.formulaBody}>토양수분은 종합 적합도에 포함하지 않습니다.</Text>
+              <Text style={styles.formulaBody}>토양 수분은 종합 적합도에 포함하지 않습니다.</Text>
             </View>
           </ScrollView>
         </Surface>
@@ -80,8 +80,7 @@ const styles = StyleSheet.create(
     },
     modalHeader: { alignItems: 'flex-start', flexDirection: 'row', gap: 18, justifyContent: 'space-between' },
     modalHeaderCopy: { flex: 1, gap: 5 },
-    modalEyebrow: { color: palette.greenDark, fontFamily: font, fontSize: 14, fontWeight: '900', letterSpacing: 1 },
-    modalTitle: { color: palette.text, fontFamily: font, fontSize: 32, fontWeight: '900', letterSpacing: -0.8, lineHeight: 41 },
+    modalTitle: { ...typeScale.dialogTitle, color: palette.text, fontFamily: font },
     modalClose: {
       alignItems: 'center',
       borderColor: palette.line,
@@ -91,8 +90,8 @@ const styles = StyleSheet.create(
       minHeight: 36,
       paddingHorizontal: 12,
     },
-    modalCloseText: { color: palette.secondary, fontFamily: font, fontSize: 14, fontWeight: '800' },
-    modalDescription: { color: palette.secondary, fontFamily: font, fontSize: 17, fontWeight: '500', lineHeight: 28 },
+    modalCloseText: { ...typeScale.button, color: palette.secondary, fontFamily: font },
+    modalDescription: { ...typeScale.body, color: palette.secondary, fontFamily: font },
     formulaModal: { gap: 22, maxHeight: '86%', maxWidth: 680, padding: 30, width: '100%' },
     formulaContent: { gap: 18, paddingBottom: 4 },
     formulaSection: {
@@ -103,8 +102,8 @@ const styles = StyleSheet.create(
       gap: 14,
       padding: 20,
     },
-    formulaSectionTitle: { color: palette.text, fontFamily: font, fontSize: 18, fontWeight: '900' },
-    formulaBody: { color: palette.secondary, fontFamily: font, fontSize: 15, fontWeight: '500', lineHeight: 24 },
+    formulaSectionTitle: { ...typeScale.cardTitle, color: palette.text, fontFamily: font },
+    formulaBody: { ...typeScale.body, color: palette.secondary, fontFamily: font },
     formulaFactorRow: {
       alignItems: 'center',
       borderTopColor: palette.line,
@@ -113,9 +112,9 @@ const styles = StyleSheet.create(
       justifyContent: 'space-between',
       paddingTop: 12,
     },
-    formulaFactorName: { color: palette.text, fontFamily: font, fontSize: 15, fontWeight: '900' },
-    formulaFactorRange: { color: palette.muted, fontFamily: font, fontSize: 13, marginTop: 3 },
-    formulaFactorScore: { color: palette.greenDark, fontFamily: font, fontSize: 18, fontWeight: '900' },
+    formulaFactorName: { ...typeScale.label, color: palette.text, fontFamily: font },
+    formulaFactorRange: { ...typeScale.caption, color: palette.muted, marginTop: 3 },
+    formulaFactorScore: { ...typeScale.cardTitle, color: palette.greenDark, fontFamily: font },
     formulaExpressionBox: {
       alignItems: 'center',
       backgroundColor: palette.greenSoft,
@@ -123,12 +122,11 @@ const styles = StyleSheet.create(
       paddingHorizontal: 16,
       paddingVertical: 20,
     },
-    formulaExpression: { color: palette.greenDark, fontFamily: font, fontSize: 18, fontWeight: '900', textAlign: 'center' },
+    formulaExpression: { ...typeScale.cardTitle, color: palette.greenDark, fontFamily: font, textAlign: 'center' },
     formulaEquivalentExpression: {
       color: palette.secondary,
       fontFamily: font,
-      fontSize: 14,
-      fontWeight: '500',
+      ...typeScale.caption,
       marginTop: 8,
       textAlign: 'center',
     },
@@ -140,6 +138,6 @@ const styles = StyleSheet.create(
       gap: 6,
       padding: 18,
     },
-    formulaNoticeTitle: { color: palette.text, fontFamily: font, fontSize: 15, fontWeight: '900' },
+    formulaNoticeTitle: { ...typeScale.label, color: palette.text, fontFamily: font },
   }),
 );

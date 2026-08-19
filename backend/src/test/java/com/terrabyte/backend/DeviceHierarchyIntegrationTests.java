@@ -86,8 +86,8 @@ class DeviceHierarchyIntegrationTests {
                 )
                 """);
         jdbcTemplate.update("""
-                UPDATE pot SET node_id = NULL, crop_code = NULL, crop_selected_at = NULL,
-                    status = 'OFFLINE', last_seen_at = NULL
+                UPDATE pot SET node_id = NULL, label = '화분 1', crop_code = NULL,
+                    crop_selected_at = NULL, status = 'OFFLINE', last_seen_at = NULL
                 """);
         jdbcTemplate.update("DELETE FROM app_user");
         jdbcTemplate.update("DELETE FROM telemetry_event");
@@ -103,6 +103,50 @@ class DeviceHierarchyIntegrationTests {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM pot WHERE device_id = ?", Integer.class, registered.path("id").asLong()))
                 .isEqualTo(1);
+    }
+
+    @Test
+    void ownerCanCreateAnotherPotWithItsOwnCrop() throws Exception {
+        String token = signup("multi-pot-owner@example.com");
+        long deviceId = register(token, "483920", null).path("id").asLong();
+
+        String created = mockMvc.perform(post("/api/devices/{deviceId}/pots", deviceId)
+                        .header("Authorization", bearer(token))
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"label\":\"바질 화분\",\"cropCode\":\"basil\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.label").value("바질 화분"))
+                .andExpect(jsonPath("$.cropCode").value("basil"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        long potId = objectMapper.readTree(created).path("id").asLong();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM pot WHERE device_id = ?", Integer.class, deviceId))
+                .isEqualTo(2);
+
+        mockMvc.perform(get("/api/pots/{potId}", potId)
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.label").value("바질 화분"))
+                .andExpect(jsonPath("$.cropCode").value("basil"));
+    }
+
+    @Test
+    void ownerCanUpdatePotLabelAndCrop() throws Exception {
+        String token = signup("update-pot-owner@example.com");
+        long deviceId = register(token, "483920", null).path("id").asLong();
+        long potId = jdbcTemplate.queryForObject(
+                "SELECT MIN(id) FROM pot WHERE device_id = ?", Long.class, deviceId);
+
+        mockMvc.perform(patch("/api/pots/{potId}", potId)
+                        .header("Authorization", bearer(token))
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"label\":\"창가 화분\",\"cropCode\":\"basil\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.label").value("창가 화분"))
+                .andExpect(jsonPath("$.cropCode").value("basil"));
     }
 
     @Test

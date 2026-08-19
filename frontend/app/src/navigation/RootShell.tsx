@@ -5,12 +5,13 @@ import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { font } from '../appTheme/glass';
 import { palette } from '../appTheme/palette';
 import { scaleTypography } from '../appTheme/scaleTypography';
+import { typeScale } from '../appTheme/typography';
 import { ensureBrandFontLoaded } from '../appTheme/webFont';
 import { clearAccessToken, getMe, loadAccessToken, type MeResponse } from '../auth/authApi';
 import { BrandMark } from '../components/BrandMark';
 import { selectPotCrop } from '../crop/cropApi';
 import { crops } from '../data';
-import { getDevice, type DeviceResponse } from '../device/deviceApi';
+import { createPot, getDevice, type DeviceResponse, updatePot as updatePotRequest } from '../device/deviceApi';
 import { Login } from '../onboarding/Login';
 import { SetupFlow } from '../onboarding/SetupFlow';
 import { AppTabNavigator } from './AppTabNavigator';
@@ -52,6 +53,28 @@ export default function RootShell() {
       ...current,
       pots: (current.pots ?? []).map((pot) => pot.id === selectedPotId ? { ...pot, cropCode: selection.crop.code } : pot),
     } : current);
+  };
+
+  const addPot = async (label: string, cropCode: string) => {
+    if (!device?.id) throw new Error('화분을 추가할 공간을 찾을 수 없습니다.');
+    const created = await createPot(device.id, { cropCode, label });
+    const nextPot = { ...created, cropCode: created.cropCode ?? cropCode };
+    setDevice((current) => current ? {
+      ...current,
+      pots: [...(current.pots ?? []), nextPot],
+    } : current);
+    setSelectedPotId(nextPot.id);
+    setSelectedCropCode(nextPot.cropCode ?? crops[0].code);
+  };
+
+  const updatePot = async (potId: number, label: string, cropCode: string) => {
+    const updated = await updatePotRequest(potId, { cropCode, label });
+    const nextPot = { ...updated, cropCode: updated.cropCode ?? cropCode };
+    setDevice((current) => current ? {
+      ...current,
+      pots: (current.pots ?? []).map((pot) => pot.id === potId ? nextPot : pot),
+    } : current);
+    if (potId === selectedPotId) setSelectedCropCode(nextPot.cropCode ?? crops[0].code);
   };
 
   const applyRegisteredDevice = (registered: DeviceResponse) => {
@@ -162,7 +185,9 @@ export default function RootShell() {
       <AppTabNavigator
         compact={compact}
         cropName={(crops[selectedCrop] ?? crops[0]).name}
+        onCreatePot={addPot}
         onSelectPot={setSelectedPotId}
+        onUpdatePot={updatePot}
         onLogout={() => {
           void clearAccessToken();
           setDeviceId(undefined);
@@ -172,7 +197,7 @@ export default function RootShell() {
           setFlow('auth');
         }}
         onSelectCrop={changeSelectedCrop}
-        pots={(device?.pots ?? []).slice(0, 4)}
+        pots={device?.pots ?? []}
         selectedCrop={selectedCrop}
         selectedPotId={selectedPotId}
       />
@@ -184,5 +209,5 @@ export default function RootShell() {
 const styles = StyleSheet.create(scaleTypography({
   root: { backgroundColor: palette.background, flex: 1, minHeight: '100vh', overflow: 'hidden', position: 'relative' } as any,
   sessionLoading: { alignItems: 'center', gap: 18, justifyContent: 'center' },
-  sessionLoadingText: { color: palette.secondary, fontFamily: font, fontSize: 16, fontWeight: '700' },
+  sessionLoadingText: { ...typeScale.bodyStrong, color: palette.secondary, fontFamily: font },
 }));

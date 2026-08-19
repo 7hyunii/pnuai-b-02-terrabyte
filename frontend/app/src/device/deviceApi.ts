@@ -32,6 +32,17 @@ export type RegisterDeviceInput = {
   areaSquareMeters: number;
 };
 
+export type CreatePotInput = {
+  label: string;
+  nodeId?: string;
+  cropCode?: string;
+};
+
+export type UpdatePotInput = {
+  label: string;
+  cropCode?: string;
+};
+
 export async function registerDevice(input: RegisterDeviceInput) {
   return authenticatedRequest<DeviceResponse>('/api/devices', {
     method: 'POST',
@@ -41,4 +52,18 @@ export async function registerDevice(input: RegisterDeviceInput) {
 
 export function getDevice(deviceId: number) {
   return authenticatedRequest<DeviceResponse>(`/api/devices/${deviceId}`);
+}
+
+export function createPot(deviceId: number, input: CreatePotInput) {
+  return authenticatedRequest<PotResponse>(`/api/devices/${deviceId}/pots`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function updatePot(potId: number, input: UpdatePotInput) {
+  return authenticatedRequest<PotResponse>(`/api/pots/${potId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
 }

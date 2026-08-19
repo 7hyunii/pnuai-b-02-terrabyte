@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { scaleTypography } from '../appTheme/scaleTypography';
 import { colors, radii, typography } from '../theme';
 
 type StepIndicatorProps = {
@@ -27,7 +28,7 @@ export function StepIndicator({ current }: StepIndicatorProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create(scaleTypography({
   wrap: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -36,24 +37,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   step: {
-    backgroundColor: 'rgba(255,255,255,0.45)',
-    borderColor: 'rgba(255,255,255,0.6)',
+    backgroundColor: colors.glassStrong,
+    borderColor: colors.lineSoft,
     borderRadius: radii.pill,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 5,
   },
   activeStep: {
-    backgroundColor: 'rgba(63,174,111,0.9)',
-    borderColor: 'rgba(63,174,111,0.9)',
+    backgroundColor: colors.accentGreen,
+    borderColor: colors.accentGreen,
   },
   stepText: {
     color: colors.textSecondary,
     fontFamily: typography.fontFamily,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   activeText: {
     color: '#fff',
   },
-});
+}));

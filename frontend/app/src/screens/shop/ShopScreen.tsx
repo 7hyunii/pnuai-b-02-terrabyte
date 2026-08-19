@@ -1,45 +1,56 @@
 import { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { controlTextTokens, controlTokens } from '../../appTheme/controls';
 import { font } from '../../appTheme/glass';
 import { palette } from '../../appTheme/palette';
 import { scaleTypography } from '../../appTheme/scaleTypography';
+import { typeScale } from '../../appTheme/typography';
 import { ActionButton } from '../../components/ActionButton';
 import { SectionHeader } from '../../components/SectionHeader';
 import { Surface } from '../../components/Surface';
 import { shopProducts, type ShopCategory, type ShopProduct } from '../../data';
-import { useDeviceEnvironment } from '../../shared/device-environment/DeviceEnvironmentProvider';
-import { getRecommendedProductIds } from '../../shared/factorPresentation';
+
+type ProductCategory = 'all' | ShopCategory;
 
 export function ShopScreen({ compact }: { compact: boolean }) {
-  const { score } = useDeviceEnvironment();
-  const [category, setCategory] = useState<'all' | ShopCategory>('all');
+  const [category, setCategory] = useState<ProductCategory>('all');
+  const [recommendedOnly, setRecommendedOnly] = useState(false);
   const [cart, setCart] = useState<Record<string, number>>({});
   const [cartOpen, setCartOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<ShopProduct | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 9;
   const filteredProducts = useMemo(
-    () => category === 'all' ? shopProducts : shopProducts.filter((product) => product.category === category),
-    [category],
+    () => {
+      const categoryProducts = category === 'all'
+        ? shopProducts
+        : shopProducts.filter((product) => product.category === category);
+      return recommendedOnly
+        ? categoryProducts.filter((product) => product.badge?.includes('추천'))
+        : categoryProducts;
+    },
+    [category, recommendedOnly],
   );
   const pageCount = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
   const visibleProducts = filteredProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const cartCount = Object.values(cart).reduce((sum, value) => sum + value, 0);
   const cartProducts = shopProducts.filter((product) => (cart[product.id] ?? 0) > 0);
   const cartTotal = cartProducts.reduce((sum, product) => sum + product.price * (cart[product.id] ?? 0), 0);
-  const recommendedProducts = getRecommendedProductIds(score?.factors ?? [])
-    .map((id) => shopProducts.find((product) => product.id === id))
-    .filter((product): product is ShopProduct => Boolean(product));
-  const tabs: Array<{ key: 'all' | ShopCategory; label: string }> = [
+  const tabs: Array<{ key: ProductCategory; label: string }> = [
     { key: 'all', label: '전체' },
     { key: 'parts', label: '부품' },
     { key: 'soil', label: '흙과 배지' },
     { key: 'seeds', label: '씨앗' },
   ];
 
-  const changeCategory = (nextCategory: 'all' | ShopCategory) => {
+  const changeCategory = (nextCategory: ProductCategory) => {
     setCategory(nextCategory);
+    setCurrentPage(1);
+  };
+
+  const toggleRecommended = () => {
+    setRecommendedOnly((current) => !current);
     setCurrentPage(1);
   };
 
@@ -49,47 +60,38 @@ export function ShopScreen({ compact }: { compact: boolean }) {
 
   return (
     <View style={styles.pageBody}>
-      <Surface style={styles.shopRecommendationPanel}>
-        <SectionHeader title="현재 공간 맞춤 추천" description="공간 진단에서 확인된 조도, 습도와 배수 개선 항목을 기준으로 추천합니다." />
-        <View style={[styles.shopRecommendationGrid, compact && styles.stack]}>
-          {recommendedProducts.map((product, index) => (
-            <Pressable key={product.id} onPress={() => setSelectedProduct(product)} style={styles.shopRecommendationCard}>
-              <View style={styles.shopRecommendationTop}>
-                <Text style={styles.shopRecommendationRank}>{index + 1}순위</Text>
-              </View>
-              <Text style={styles.shopRecommendationName}>{product.name}</Text>
-              <Text style={styles.shopRecommendationDescription}>{product.desc}</Text>
-              <View style={styles.shopRecommendationBottom}>
-                <Text style={styles.shopRecommendationPrice}>{product.price.toLocaleString('ko-KR')}원</Text>
-                <Pressable
-                  onPress={(event) => {
-                    event.stopPropagation?.();
-                    addToCart(product);
-                  }}
-                  style={styles.addButton}
-                >
-                  <Text style={styles.addButtonText}>담기</Text>
-                </Pressable>
-              </View>
-            </Pressable>
-          ))}
-        </View>
-      </Surface>
-
       <View style={[styles.shopToolbar, compact && styles.shopToolbarCompact]}>
-        <View style={styles.shopTabs}>
-          {tabs.map((tab) => (
-            <Pressable key={tab.key} onPress={() => changeCategory(tab.key)} style={[styles.shopTab, category === tab.key && styles.shopTabActive]}>
-              <Text style={[styles.shopTabText, category === tab.key && styles.shopTabTextActive]}>{tab.label}</Text>
-            </Pressable>
-          ))}
+        <View style={styles.shopFilters}>
+          <View style={styles.shopTabs}>
+            {tabs.map((tab) => (
+              <Pressable key={tab.key} onPress={() => changeCategory(tab.key)} style={[styles.shopTab, category === tab.key && styles.shopTabActive]}>
+                <Text style={[styles.shopTabText, category === tab.key && styles.shopTabTextActive]}>{tab.label}</Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
-        <Pressable accessibilityRole="button" onPress={() => setCartOpen(true)} style={styles.cartButton}>
-          <Text style={styles.cartCount}>장바구니 {cartCount}</Text>
-        </Pressable>
+        <View style={[styles.shopToolbarActions, compact && styles.shopToolbarActionsCompact]}>
+          <Pressable accessibilityRole="button" onPress={() => setCartOpen(true)} style={styles.cartButton}>
+            <Text style={styles.cartCount}>장바구니 {cartCount}</Text>
+          </Pressable>
+        </View>
       </View>
-      <Surface style={styles.productPanel}>
-        <SectionHeader title="전체 제품" description={`전체 ${filteredProducts.length}개 · ${currentPage} / ${pageCount} 페이지`} />
+      <Surface flat style={styles.productPanel}>
+        <SectionHeader
+          action={(
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="추천 제품 보기"
+              accessibilityState={{ selected: recommendedOnly }}
+              onPress={toggleRecommended}
+              style={[styles.recommendationButton, recommendedOnly && styles.recommendationButtonActive]}
+            >
+              <Text style={[styles.recommendationButtonText, recommendedOnly && styles.recommendationButtonTextActive]}>추천 제품 보기</Text>
+            </Pressable>
+          )}
+          title={recommendedOnly ? `${category === 'all' ? '' : `${tabs.find((tab) => tab.key === category)?.label} `}추천 제품` : category === 'all' ? '전체 제품' : tabs.find((tab) => tab.key === category)?.label ?? '제품'}
+          description={recommendedOnly ? `추천 태그가 붙은 제품 ${filteredProducts.length}개` : `제품 ${filteredProducts.length}개 · ${currentPage} / ${pageCount} 페이지`}
+        />
         <View style={[styles.productGrid, compact && styles.stack]}>
           {visibleProducts.map((product) => (
             <Pressable key={product.id} onPress={() => setSelectedProduct(product)} style={[styles.productCard, compact && styles.productCardCompact]}>
@@ -166,7 +168,6 @@ export function ShopScreen({ compact }: { compact: boolean }) {
           <Surface style={styles.cartModal}>
             <View style={styles.modalHeader}>
               <View style={styles.modalHeaderCopy}>
-                <Text style={styles.modalEyebrow}>CART</Text>
                 <Text style={styles.modalTitle}>장바구니</Text>
               </View>
               <Pressable onPress={() => setCartOpen(false)} style={styles.modalClose}>
@@ -216,71 +217,69 @@ const styles = StyleSheet.create(scaleTypography({
   stack: { flexDirection: 'column' },
   shopToolbar: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4 },
   shopToolbarCompact: { alignItems: 'flex-start', flexDirection: 'column', gap: 12 },
+  shopFilters: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  shopToolbarActions: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'flex-end' },
+  shopToolbarActionsCompact: { justifyContent: 'flex-start', width: '100%' },
   shopTabs: { backgroundColor: 'rgba(255,255,255,0.48)', borderColor: palette.lineStrong, borderRadius: 11, borderWidth: 1, flexDirection: 'row', gap: 3, padding: 5 },
   shopTab: { borderRadius: 8, paddingHorizontal: 20, paddingVertical: 10 },
   shopTabActive: { backgroundColor: palette.green, shadowColor: '#1f6646', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.16, shadowRadius: 10 },
-  shopTabText: { color: palette.secondary, fontFamily: font, fontSize: 17, fontWeight: '800' },
-  shopTabTextActive: { color: '#ffffff', fontWeight: '900' },
-  cartButton: { alignItems: 'center', backgroundColor: palette.panelMuted, borderColor: palette.line, borderRadius: 9, borderWidth: 1, justifyContent: 'center', minHeight: 42, paddingHorizontal: 17 },
-  cartCount: { color: palette.secondary, fontFamily: font, fontSize: 16, fontWeight: '800' },
-  shopRecommendationPanel: { gap: 28, padding: 34 },
-  shopRecommendationGrid: { flexDirection: 'row', gap: 16 },
-  shopRecommendationCard: { backgroundColor: palette.greenSoft, borderColor: '#c2dccb', borderRadius: 14, borderWidth: 1, flex: 1, gap: 10, minHeight: 220, padding: 24 },
-  shopRecommendationTop: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  shopRecommendationRank: { color: palette.greenDark, fontFamily: font, fontSize: 14, fontWeight: '900' },
-  shopRecommendationName: { color: palette.text, fontFamily: font, fontSize: 22, fontWeight: '900', lineHeight: 30 },
-  shopRecommendationDescription: { color: palette.secondary, flex: 1, fontFamily: font, fontSize: 15, fontWeight: '500', lineHeight: 24 },
-  shopRecommendationBottom: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  shopRecommendationPrice: { color: palette.greenDark, fontFamily: font, fontSize: 21, fontWeight: '900' },
+  shopTabText: { ...typeScale.label, color: palette.secondary, fontFamily: font },
+  shopTabTextActive: { color: '#ffffff', fontWeight: '700' },
+  recommendationButton: { ...controlTokens.outline, borderColor: palette.green, minHeight: 42, paddingHorizontal: 17 },
+  recommendationButtonActive: { backgroundColor: palette.green },
+  recommendationButtonText: { ...typeScale.button, ...controlTextTokens.outline, fontFamily: font },
+  recommendationButtonTextActive: { color: '#ffffff' },
+  cartButton: { ...controlTokens.secondary, minHeight: 42, paddingHorizontal: 17 },
+  cartCount: { ...typeScale.button, ...controlTextTokens.secondary, fontFamily: font, fontWeight: '700' },
   productPanel: { gap: 34, padding: 36 },
-  productGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 20 },
-  productCard: { backgroundColor: 'rgba(255,255,255,0.48)', borderColor: palette.lineStrong, borderRadius: 15, borderWidth: 1, flexBasis: '31%', flexGrow: 1, gap: 16, maxWidth: '32%', minHeight: 250, minWidth: 240, padding: 27, shadowColor: '#203329', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.06, shadowRadius: 18 },
+  productGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
+  productCard: { backgroundColor: 'rgba(255,255,255,0.16)', borderColor: 'rgba(86,120,101,0.24)', borderRadius: 16, borderWidth: 1, flexBasis: '31%', flexGrow: 1, gap: 16, maxWidth: '32%', minHeight: 250, minWidth: 240, padding: 27 },
   productCardCompact: { flexBasis: 'auto', maxWidth: '100%', minWidth: 0, width: '100%' },
   productCardTop: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', minHeight: 24 },
-  productCategoryText: { color: palette.greenDark, fontFamily: font, fontSize: 15, fontWeight: '900', letterSpacing: 0.5 },
-  productName: { color: palette.text, fontFamily: font, fontSize: 21, fontWeight: '900', lineHeight: 29 },
-  productBadge: { backgroundColor: palette.greenSoft, borderRadius: 999, color: palette.greenDark, fontFamily: font, fontSize: 14, fontWeight: '800', paddingHorizontal: 10, paddingVertical: 5 },
-  productDescription: { color: palette.secondary, flex: 1, fontFamily: font, fontSize: 15, fontWeight: '500', lineHeight: 25 },
+  productCategoryText: { ...typeScale.label, color: palette.greenDark, fontFamily: font, letterSpacing: 0.5 },
+  productName: { ...typeScale.cardTitle, color: palette.text, fontFamily: font, fontWeight: '600' },
+  productBadge: { ...typeScale.label, backgroundColor: palette.greenSoft, borderRadius: 999, color: palette.greenDark, fontFamily: font, paddingHorizontal: 10, paddingVertical: 5 },
+  productDescription: { ...typeScale.body, color: palette.secondary, flex: 1, fontFamily: font },
   productDivider: { backgroundColor: palette.lineStrong, height: 1 },
   productBottom: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  productPrice: { color: palette.greenDark, fontFamily: font, fontSize: 21, fontWeight: '900', letterSpacing: -0.3 },
-  addButton: { backgroundColor: palette.green, borderRadius: 7, paddingHorizontal: 14, paddingVertical: 9 },
-  addButtonText: { color: '#ffffff', fontFamily: font, fontSize: 15, fontWeight: '800' },
+  productPrice: { ...typeScale.cardTitle, color: palette.greenDark, fontFamily: font, letterSpacing: -0.3 },
+  addButton: { ...controlTokens.primary, minHeight: 38, paddingHorizontal: 14, paddingVertical: 9 },
+  addButtonText: { ...typeScale.button, ...controlTextTokens.primary, fontFamily: font },
   pagination: { alignItems: 'center', flexDirection: 'row', gap: 7, justifyContent: 'center', paddingTop: 4 },
-  pageArrow: { alignItems: 'center', borderColor: palette.line, borderRadius: 8, borderWidth: 1, justifyContent: 'center', minHeight: 36, paddingHorizontal: 13 },
+  pageArrow: { ...controlTokens.outline, minHeight: 36, paddingHorizontal: 13 },
   pageDisabled: { opacity: 0.35 },
-  pageArrowText: { color: palette.secondary, fontFamily: font, fontSize: 14, fontWeight: '800' },
+  pageArrowText: { ...typeScale.button, color: palette.secondary, fontFamily: font },
   pageNumber: { alignItems: 'center', borderRadius: 8, height: 36, justifyContent: 'center', width: 36 },
   pageNumberActive: { backgroundColor: palette.green },
-  pageNumberText: { color: palette.secondary, fontFamily: font, fontSize: 15, fontWeight: '800' },
+  pageNumberText: { ...typeScale.label, color: palette.secondary, fontFamily: font },
   pageNumberTextActive: { color: '#ffffff' },
   modalBackdrop: { alignItems: 'center', backgroundColor: 'rgba(21, 46, 35, 0.34)', flex: 1, justifyContent: 'center', padding: 22 },
   detailModal: { gap: 24, maxWidth: 560, padding: 28, width: '100%' },
   cartModal: { gap: 20, maxHeight: '82%', maxWidth: 620, padding: 28, width: '100%' },
   modalHeader: { alignItems: 'flex-start', flexDirection: 'row', gap: 18, justifyContent: 'space-between' },
   modalHeaderCopy: { flex: 1, gap: 5 },
-  modalEyebrow: { color: palette.greenDark, fontFamily: font, fontSize: 14, fontWeight: '900', letterSpacing: 1 },
-  modalTitle: { color: palette.text, fontFamily: font, fontSize: 32, fontWeight: '900', letterSpacing: -0.8, lineHeight: 41 },
+  modalEyebrow: { ...typeScale.label, color: palette.greenDark, fontFamily: font, letterSpacing: 1 },
+  modalTitle: { ...typeScale.dialogTitle, color: palette.text, fontFamily: font },
   modalClose: { alignItems: 'center', borderColor: palette.line, borderRadius: 8, borderWidth: 1, justifyContent: 'center', minHeight: 36, paddingHorizontal: 12 },
-  modalCloseText: { color: palette.secondary, fontFamily: font, fontSize: 14, fontWeight: '800' },
-  modalDescription: { color: palette.secondary, fontFamily: font, fontSize: 17, fontWeight: '500', lineHeight: 28 },
+  modalCloseText: { ...typeScale.button, color: palette.secondary, fontFamily: font },
+  modalDescription: { ...typeScale.body, color: palette.secondary, fontFamily: font },
   productInfoList: { borderColor: palette.line, borderRadius: 12, borderWidth: 1, overflow: 'hidden' },
   productInfoRow: { alignItems: 'center', borderBottomColor: palette.line, borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: 50, paddingHorizontal: 16 },
-  productInfoLabel: { color: palette.muted, fontFamily: font, fontSize: 15, fontWeight: '700' },
-  productInfoValue: { color: palette.text, fontFamily: font, fontSize: 16, fontWeight: '800' },
+  productInfoLabel: { ...typeScale.label, color: palette.muted, fontFamily: font },
+  productInfoValue: { ...typeScale.bodyStrong, color: palette.text, fontFamily: font },
   modalFooter: { alignItems: 'center', flexDirection: 'row', gap: 18, justifyContent: 'space-between' },
-  modalPrice: { color: palette.text, fontFamily: font, fontSize: 24, fontWeight: '900' },
+  modalPrice: { ...typeScale.cardTitle, color: palette.text, fontFamily: font },
   cartList: { maxHeight: 380 },
-  emptyCart: { color: palette.muted, fontFamily: font, fontSize: 17, paddingVertical: 46, textAlign: 'center' },
+  emptyCart: { ...typeScale.body, color: palette.muted, paddingVertical: 46, textAlign: 'center' },
   cartItem: { alignItems: 'center', borderBottomColor: palette.line, borderBottomWidth: 1, flexDirection: 'row', gap: 18, justifyContent: 'space-between', minHeight: 74, paddingVertical: 12 },
   cartItemCopy: { flex: 1, gap: 5 },
-  cartItemName: { color: palette.text, fontFamily: font, fontSize: 18, fontWeight: '900' },
-  cartItemPrice: { color: palette.secondary, fontFamily: font, fontSize: 15 },
+  cartItemName: { ...typeScale.cardTitle, color: palette.text, fontFamily: font, fontWeight: '600' },
+  cartItemPrice: { ...typeScale.body, color: palette.secondary, fontFamily: font },
   quantityControl: { alignItems: 'center', flexDirection: 'row', gap: 10 },
   quantityButton: { alignItems: 'center', backgroundColor: palette.panelMuted, borderColor: palette.line, borderRadius: 7, borderWidth: 1, height: 32, justifyContent: 'center', width: 32 },
-  quantityButtonText: { color: palette.greenDark, fontFamily: font, fontSize: 16, fontWeight: '900' },
-  quantityValue: { color: palette.text, fontFamily: font, fontSize: 16, fontWeight: '900', minWidth: 24, textAlign: 'center' },
+  quantityButtonText: { color: palette.greenDark, fontFamily: font, fontSize: 16, fontWeight: '700' },
+  quantityValue: { ...typeScale.label, color: palette.text, fontFamily: font, fontWeight: '700', minWidth: 24, textAlign: 'center' },
   cartTotalRow: { alignItems: 'center', borderTopColor: palette.lineStrong, borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-between', paddingTop: 18 },
-  cartTotalLabel: { color: palette.secondary, fontFamily: font, fontSize: 17, fontWeight: '800' },
-  cartTotalValue: { color: palette.text, fontFamily: font, fontSize: 22, fontWeight: '900' },
+  cartTotalLabel: { ...typeScale.label, color: palette.secondary, fontFamily: font },
+  cartTotalValue: { ...typeScale.cardTitle, color: palette.text, fontFamily: font },
 }));

@@ -3,7 +3,10 @@ import type { GestureResponderEvent, StyleProp, TextStyle, ViewStyle } from 'rea
 import { Pressable, StyleSheet, Text } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { colors, radii, typography } from '../theme';
+import { controlTokens } from '../appTheme/controls';
+import { font } from '../appTheme/glass';
+import { palette } from '../appTheme/palette';
+import { typeScale } from '../appTheme/typography';
 
 type PrimaryButtonProps = {
   label: string;
@@ -35,7 +38,7 @@ export function PrimaryButton({
       ]}
     >
       <LinearGradient
-        colors={[colors.brandStart, colors.brandEnd]}
+        colors={[palette.green, palette.greenDark]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.gradient}
@@ -48,26 +51,25 @@ export function PrimaryButton({
 
 const styles = StyleSheet.create({
   pressable: {
-    borderRadius: radii.control,
+    ...controlTokens.primary,
     overflow: 'hidden',
     shadowColor: '#2b8f6e',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.35,
-    shadowRadius: 24,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    elevation: 2,
   },
   gradient: {
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 48,
+    minHeight: 46,
     paddingHorizontal: 18,
     paddingVertical: 13,
   },
   text: {
+    ...typeScale.button,
     color: '#fff',
-    fontFamily: typography.fontFamily,
-    fontSize: 15,
-    fontWeight: '800',
+    fontFamily: font,
   },
   disabled: {
     opacity: 0.45,
