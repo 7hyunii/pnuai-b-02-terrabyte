@@ -2,11 +2,13 @@ package com.terrabyte.backend.measurement;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 import com.terrabyte.backend.api.ApiException;
 import com.terrabyte.backend.device.Device;
 import com.terrabyte.backend.device.DeviceRepository;
+import com.terrabyte.backend.device.DeviceStatus;
 import com.terrabyte.backend.pot.Pot;
 import com.terrabyte.backend.pot.PotRepository;
 import org.slf4j.Logger;
@@ -132,8 +134,27 @@ public class MeasurementService {
                 metric.field(),
                 metric.unit(),
                 range.value(),
-                measurementStore.findPoints(
+                        measurementStore.findPoints(
                         pot.id(), metric, clock.instant().minus(range.duration())));
+    }
+
+    public DeviceSensorStatusResponse sensorStatus(long userId, long deviceId) {
+        Device device = deviceRepository.findByIdAndUserId(deviceId, userId)
+                .orElseThrow(() -> new ApiException(
+                        HttpStatus.NOT_FOUND, "DEVICE_NOT_FOUND", "기기를 찾을 수 없습니다."));
+        List<DeviceSensorStatusResponse.SensorStatus> sensors = new ArrayList<>();
+        for (Pot pot : potRepository.findAllByDevice(device.id())) {
+            TelemetrySample sample = measurementStore.findLatest(pot.id()).orElse(null);
+            sensors.add(sensor(pot, "air", "온·습도 센서", "air_temperature_c,air_humidity_pct",
+                    device, sample, sample != null && sample.airSensorValid()));
+            sensors.add(sensor(pot, "light", "조도 센서", "plant_light_ppfd_umol_m2_s",
+                    device, sample, sample != null && sample.lightSensorValid()));
+            sensors.add(sensor(pot, "soil-moisture", "토양 수분 센서", "soil_moisture_pct",
+                    device, sample, sample != null && sample.soilSensorValid()));
+            sensors.add(sensor(pot, "soil-temperature", "토양 온도 센서", "soil_temperature_c",
+                    device, sample, sample != null && sample.soilSensorValid() && sample.soilTemperatureC() != null));
+        }
+        return new DeviceSensorStatusResponse(device.id(), sensors);
     }
 
     @Deprecated
@@ -169,6 +190,30 @@ public class MeasurementService {
         return potRepository.representative(deviceId, userId)
                 .orElseThrow(() -> new ApiException(
                         HttpStatus.NOT_FOUND, "DEVICE_NOT_FOUND", "기기를 찾을 수 없습니다."));
+    }
+
+    private DeviceSensorStatusResponse.SensorStatus sensor(
+            Pot pot,
+            String sensorKey,
+            String label,
+            String metric,
+            Device device,
+            TelemetrySample sample,
+            boolean valid) {
+        DeviceSensorStatusResponse.Status status = device.status() != DeviceStatus.ONLINE
+                ? DeviceSensorStatusResponse.Status.OFFLINE
+                : sample == null
+                        ? DeviceSensorStatusResponse.Status.UNKNOWN
+                        : valid
+                                ? DeviceSensorStatusResponse.Status.ONLINE
+                                : DeviceSensorStatusResponse.Status.UNAVAILABLE;
+        return new DeviceSensorStatusResponse.SensorStatus(
+                pot.id() + ":" + sensorKey,
+                pot.id(),
+                pot.label(),
+                label,
+                metric,
+                status);
     }
 
     private Pot ownedPot(long userId, long potId) {
