@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { controlTextTokens, controlTokens } from '../../appTheme/controls';
@@ -9,33 +9,50 @@ import { typeScale } from '../../appTheme/typography';
 import { ActionButton } from '../../components/ActionButton';
 import { SectionHeader } from '../../components/SectionHeader';
 import { Surface } from '../../components/Surface';
-import { shopProducts, type ShopCategory, type ShopProduct } from '../../data';
+import { getShopProducts, type ShopCategory, type ShopProduct } from '../../shop/shopApi';
 
 type ProductCategory = 'all' | ShopCategory;
 
-export function ShopScreen({ compact }: { compact: boolean }) {
+export function ShopScreen({ compact, fetchProducts = getShopProducts }: { compact: boolean; fetchProducts?: typeof getShopProducts }) {
   const [category, setCategory] = useState<ProductCategory>('all');
   const [recommendedOnly, setRecommendedOnly] = useState(false);
   const [cart, setCart] = useState<Record<string, number>>({});
   const [cartOpen, setCartOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<ShopProduct | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [products, setProducts] = useState<ShopProduct[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const pageSize = 9;
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError(null);
+    void fetchProducts()
+      .then((nextProducts) => { if (active) setProducts(nextProducts); })
+      .catch((caught) => {
+        if (active) setError(caught instanceof Error ? caught.message : '상품 목록을 불러오지 못했습니다.');
+      })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [fetchProducts]);
+
   const filteredProducts = useMemo(
     () => {
       const categoryProducts = category === 'all'
-        ? shopProducts
-        : shopProducts.filter((product) => product.category === category);
+        ? products
+        : products.filter((product) => product.category === category);
       return recommendedOnly
         ? categoryProducts.filter((product) => product.badge?.includes('추천'))
         : categoryProducts;
     },
-    [category, recommendedOnly],
+    [category, products, recommendedOnly],
   );
   const pageCount = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
   const visibleProducts = filteredProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const cartCount = Object.values(cart).reduce((sum, value) => sum + value, 0);
-  const cartProducts = shopProducts.filter((product) => (cart[product.id] ?? 0) > 0);
+  const cartProducts = products.filter((product) => (cart[product.id] ?? 0) > 0);
   const cartTotal = cartProducts.reduce((sum, product) => sum + product.price * (cart[product.id] ?? 0), 0);
   const tabs: Array<{ key: ProductCategory; label: string }> = [
     { key: 'all', label: '전체' },
@@ -93,7 +110,10 @@ export function ShopScreen({ compact }: { compact: boolean }) {
           description={recommendedOnly ? `추천 태그가 붙은 제품 ${filteredProducts.length}개` : `제품 ${filteredProducts.length}개 · ${currentPage} / ${pageCount} 페이지`}
         />
         <View style={[styles.productGrid, compact && styles.stack]}>
-          {visibleProducts.map((product) => (
+          {loading ? <Text style={styles.emptyProducts}>상품 목록을 불러오는 중입니다.</Text> : null}
+          {error ? <Text accessibilityRole="alert" style={styles.emptyProducts}>{error}</Text> : null}
+          {!loading && !error && !visibleProducts.length ? <Text style={styles.emptyProducts}>표시할 상품이 없습니다.</Text> : null}
+          {!loading && !error && visibleProducts.map((product) => (
             <Pressable key={product.id} onPress={() => setSelectedProduct(product)} style={[styles.productCard, compact && styles.productCardCompact]}>
               <View style={styles.productCardTop}>
                 <Text style={styles.productCategoryText}>{product.category === 'parts' ? '부품' : product.category === 'soil' ? '흙과 배지' : '씨앗'}</Text>
@@ -271,6 +291,7 @@ const styles = StyleSheet.create(scaleTypography({
   modalPrice: { ...typeScale.cardTitle, color: palette.text, fontFamily: font },
   cartList: { maxHeight: 380 },
   emptyCart: { ...typeScale.body, color: palette.muted, paddingVertical: 46, textAlign: 'center' },
+  emptyProducts: { ...typeScale.body, color: palette.muted, paddingVertical: 34, textAlign: 'center', width: '100%' },
   cartItem: { alignItems: 'center', borderBottomColor: palette.line, borderBottomWidth: 1, flexDirection: 'row', gap: 18, justifyContent: 'space-between', minHeight: 74, paddingVertical: 12 },
   cartItemCopy: { flex: 1, gap: 5 },
   cartItemName: { ...typeScale.cardTitle, color: palette.text, fontFamily: font, fontWeight: '600' },
