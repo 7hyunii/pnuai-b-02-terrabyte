@@ -27,9 +27,10 @@ export type PotResponse = {
 
 export type RegisterDeviceInput = {
   serialCode: string;
-  spaceName: string;
-  spaceType: string;
-  areaSquareMeters: number;
+  spaceId?: number;
+  spaceName?: string;
+  spaceType?: string;
+  areaSquareMeters?: number;
 };
 
 export type CreatePotInput = {

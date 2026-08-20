@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { font } from '../../appTheme/glass';
@@ -7,27 +8,50 @@ import { typeScale } from '../../appTheme/typography';
 import { ActionButton } from '../../components/ActionButton';
 import { SectionHeader } from '../../components/SectionHeader';
 import { Surface } from '../../components/Surface';
+import { getDiagnosticHistory, type DiagnosticHistoryRecord } from '../../history/historyApi';
 import type { Page } from '../../navigation/types';
 
-export function HistoryScreen({ compact, onNavigate }: { compact: boolean; onNavigate: (page: Page) => void }) {
-  const records = [
-    { date: '2026. 07. 22', score: 82, summary: '조도 보완 후 전환 적합도 상승', issues: '습도 관리 필요' },
-    { date: '2026. 07. 15', score: 75, summary: '토양분석 세트 연결 및 관수 기준 설정', issues: '조도·습도 보완 필요' },
-    { date: '2026. 07. 08', score: 68, isInitial: true, summary: '옥상 공간의 채광·환기·환경 조건 분석', issues: '조도·습도·배수 보완 필요' },
-  ];
-  const initialScore = records.find((record) => record.isInitial)?.score ?? records[records.length - 1].score;
-  const currentScore = records[0]?.score ?? initialScore;
+export function HistoryScreen({ compact, onNavigate, potId }: { compact: boolean; onNavigate: (page: Page) => void; potId?: number }) {
+  const [records, setRecords] = useState<DiagnosticHistoryRecord[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    if (!potId) {
+      setRecords([]);
+      setLoading(false);
+      return () => { active = false; };
+    }
+    setLoading(true);
+    setError(null);
+    void getDiagnosticHistory(potId)
+      .then((history) => { if (active) setRecords(history); })
+      .catch((caught) => {
+        if (active) setError(caught instanceof Error ? caught.message : '진단 이력을 불러오지 못했습니다.');
+      })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [potId]);
+
+  const initialScore = records[records.length - 1]?.score ?? 0;
+  const currentScore = records[0]?.score ?? 0;
   const accumulatedImprovement = currentScore - initialScore;
+  const observedDates = records.map((record) => new Date(record.observedAt));
+  const collectedDays = observedDates.length > 1
+    ? Math.max(1, Math.ceil((observedDates[0].getTime() - observedDates[observedDates.length - 1].getTime()) / (1000 * 60 * 60 * 24)))
+    : 0;
+  const formatDate = (observedAt: string) => new Date(observedAt).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
 
   return (
     <View style={styles.pageBody}>
       <Surface flat style={styles.historySummaryPanel}>
         <SectionHeader title="환경 진단 변화" description="최초 공간 진단부터 현재 모니터링까지의 변화입니다." />
         <View style={[styles.historySummaryGrid, compact && styles.stack]}>
-          <View style={styles.historySummaryItem}><Text style={styles.historySummaryLabel}>현재 적합도</Text><Text style={[styles.historySummaryValue, styles.historyScoreCurrent]}>{currentScore}점</Text></View>
-          <View style={styles.historySummaryItem}><Text style={styles.historySummaryLabel}>최초 적합도</Text><Text style={[styles.historySummaryValue, styles.historyScoreInitial]}>{initialScore}점</Text></View>
-          <View style={styles.historySummaryItem}><Text style={styles.historySummaryLabel}>누적 개선</Text><Text style={[styles.historySummaryValue, accumulatedImprovement > 0 ? styles.historyScoreUp : accumulatedImprovement < 0 ? styles.historyScoreDown : styles.historyScoreInitial]}>{accumulatedImprovement > 0 ? '+' : ''}{accumulatedImprovement}점</Text></View>
-          <View style={styles.historySummaryItem}><Text style={styles.historySummaryLabel}>수집 데이터</Text><Text style={styles.historySummaryValue}>14일</Text></View>
+          <View style={styles.historySummaryItem}><Text style={styles.historySummaryLabel}>현재 적합도</Text><Text style={[styles.historySummaryValue, styles.historyScoreCurrent]}>{records.length ? `${Math.round(currentScore)}점` : '--'}</Text></View>
+          <View style={styles.historySummaryItem}><Text style={styles.historySummaryLabel}>최초 적합도</Text><Text style={[styles.historySummaryValue, styles.historyScoreInitial]}>{records.length ? `${Math.round(initialScore)}점` : '--'}</Text></View>
+          <View style={styles.historySummaryItem}><Text style={styles.historySummaryLabel}>누적 개선</Text><Text style={[styles.historySummaryValue, accumulatedImprovement > 0 ? styles.historyScoreUp : accumulatedImprovement < 0 ? styles.historyScoreDown : styles.historyScoreInitial]}>{records.length ? `${accumulatedImprovement > 0 ? '+' : ''}${Math.round(accumulatedImprovement)}점` : '--'}</Text></View>
+          <View style={styles.historySummaryItem}><Text style={styles.historySummaryLabel}>수집 데이터</Text><Text style={styles.historySummaryValue}>{records.length ? `${collectedDays}일` : '--'}</Text></View>
         </View>
       </Surface>
 
@@ -35,19 +59,22 @@ export function HistoryScreen({ compact, onNavigate }: { compact: boolean; onNav
         <SectionHeader title="진단 기록" description="측정 조건과 개선 전후 결과를 시간순으로 확인할 수 있습니다." />
         <View style={styles.historyList}>
           {records.map((record, index) => (
-            <View key={record.date} style={[styles.historyRow, compact && styles.stack]}>
-              <View style={styles.historyDateBlock}><Text style={styles.historyDate}>{record.date}</Text></View>
-              <View style={styles.historyScoreBlock}><Text style={[styles.historyScore, record.score > initialScore ? styles.historyScoreUp : record.score < initialScore ? styles.historyScoreDown : styles.historyScoreInitial]}>{record.score}</Text><Text style={styles.historyScoreUnit}>점</Text></View>
+            <View key={record.observedAt} style={[styles.historyRow, compact && styles.stack]}>
+              <View style={styles.historyDateBlock}><Text style={styles.historyDate}>{formatDate(record.observedAt)}</Text></View>
+              <View style={styles.historyScoreBlock}><Text style={[styles.historyScore, record.score > initialScore ? styles.historyScoreUp : record.score < initialScore ? styles.historyScoreDown : styles.historyScoreInitial]}>{Math.round(record.score)}</Text><Text style={styles.historyScoreUnit}>점</Text></View>
               <View style={styles.historyCopy}><Text style={styles.historyTitle}>{record.summary}</Text><Text style={styles.historyIssue}>주요 결과 · {record.issues}</Text></View>
               {index === 0 ? <ActionButton label="보고서 열기" onPress={() => onNavigate('analysis')} quiet /> : <Text style={styles.historyArchived}>보관된 보고서</Text>}
             </View>
           ))}
+          {loading ? <Text style={styles.historyIssue}>진단 이력을 불러오는 중입니다.</Text> : null}
+          {error ? <Text accessibilityRole="alert" style={styles.historyIssue}>{error}</Text> : null}
+          {!loading && !error && !records.length ? <Text style={styles.historyIssue}>표시할 진단 이력이 아직 없습니다.</Text> : null}
         </View>
       </Surface>
 
       <Surface flat style={styles.historyComparePanel}>
-        <View style={styles.historyCompareCopy}><Text style={styles.historyCompareTitle}>보조 조명 설치 후 조도 점수가 가장 크게 개선됐습니다</Text><Text style={styles.historyCompareBody}>일평균 조도는 9,600lux에서 11,800lux로 상승했고, 권장 범위 미달 시간은 하루 8.2시간에서 4.6시간으로 줄었습니다.</Text></View>
-        <View style={styles.historyCompareValue}><Text style={styles.historyCompareValueLabel}>조도 점수 변화</Text><Text style={styles.historyCompareValueNumber}><Text style={styles.historyCompareValueBaseline}>54</Text><Text style={styles.historyCompareValueArrow}> → </Text><Text style={styles.historyScoreUp}>71</Text></Text></View>
+          <View style={styles.historyCompareCopy}><Text style={styles.historyCompareTitle}>최초 측정 이후 환경 적합도 변화를 확인할 수 있습니다.</Text><Text style={styles.historyCompareBody}>저장된 측정 시점의 온도·습도·광량으로 적합도를 다시 계산한 기록입니다.</Text></View>
+          <View style={styles.historyCompareValue}><Text style={styles.historyCompareValueLabel}>적합도 변화</Text><Text style={styles.historyCompareValueNumber}><Text style={styles.historyCompareValueBaseline}>{records.length ? Math.round(initialScore) : '--'}</Text><Text style={styles.historyCompareValueArrow}> → </Text><Text style={styles.historyScoreUp}>{records.length ? Math.round(currentScore) : '--'}</Text></Text></View>
       </Surface>
     </View>
   );

@@ -14,6 +14,7 @@ import { crops } from '../data';
 import { createPot, getDevice, type DeviceResponse, updatePot as updatePotRequest } from '../device/deviceApi';
 import { Login } from '../onboarding/Login';
 import { SetupFlow } from '../onboarding/SetupFlow';
+import { getPot, getPots } from '../pot/potApi';
 import { AppTabNavigator } from './AppTabNavigator';
 import { GlassBackdrop } from './GlassBackdrop';
 import type { FlowStage } from './types';
@@ -125,6 +126,52 @@ export default function RootShell() {
   }, [deviceId, device?.id]);
 
   useEffect(() => {
+    if (!device?.id) return undefined;
+    let active = true;
+    void getPots()
+      .then((pots) => {
+        if (!active) return;
+        const devicePots = pots.filter((pot) => pot.deviceId === device.id);
+        setDevice((current) => current?.id === device.id ? { ...current, pots: devicePots } : current);
+        setSelectedPotId((current) => devicePots.some((pot) => pot.id === current)
+          ? current
+          : devicePots[0]?.id);
+      })
+      .catch(() => {
+        // 목록 조회에 실패하면 기기 상세 응답에 포함된 화분 목록을 유지한다.
+      });
+    return () => {
+      active = false;
+    };
+  }, [device?.id]);
+
+  useEffect(() => {
+    if (!selectedPotId) return undefined;
+    let active = true;
+    void getPot(selectedPotId)
+      .then((pot) => {
+        if (!active) return;
+        setDevice((current) => {
+          if (!current || pot.deviceId !== current.id) return current;
+          const currentPots = current.pots ?? [];
+          const exists = currentPots.some((currentPot) => currentPot.id === pot.id);
+          return {
+            ...current,
+            pots: exists
+              ? currentPots.map((currentPot) => currentPot.id === pot.id ? pot : currentPot)
+              : [...currentPots, pot],
+          };
+        });
+      })
+      .catch(() => {
+        // 상세 조회에 실패하면 목록에 있던 화분 정보를 유지한다.
+      });
+    return () => {
+      active = false;
+    };
+  }, [selectedPotId]);
+
+  useEffect(() => {
     const selectedPot = (device?.pots ?? []).find((pot) => pot.id === selectedPotId);
     setSelectedCropCode(selectedPot?.cropCode ?? crops[0].code);
   }, [device, selectedPotId]);
@@ -185,6 +232,7 @@ export default function RootShell() {
       <AppTabNavigator
         compact={compact}
         cropName={(crops[selectedCrop] ?? crops[0]).name}
+        device={device ?? undefined}
         onCreatePot={addPot}
         onSelectPot={setSelectedPotId}
         onUpdatePot={updatePot}

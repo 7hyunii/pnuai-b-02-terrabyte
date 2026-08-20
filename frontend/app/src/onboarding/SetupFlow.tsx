@@ -12,6 +12,7 @@ import { getCrops, selectPotCrop, type CropResponse } from '../crop/cropApi';
 import { crops } from '../data';
 import { registerDevice, type DeviceResponse } from '../device/deviceApi';
 import type { FlowStage } from '../navigation/types';
+import { createCultivationSpace, getCultivationSpaces, type CultivationSpaceResponse } from '../space/spaceApi';
 
 type AreaUnit = 'SQUARE_METERS' | 'PYEONG';
 
@@ -118,6 +119,11 @@ export function SetupFlow({
   const [spaceType, setSpaceType] = useState<(typeof spaceTypeOptions)[number]['value'] | ''>('');
   const [areaSquareMeters, setAreaSquareMeters] = useState('');
   const [areaUnit, setAreaUnit] = useState<AreaUnit>('SQUARE_METERS');
+  const [cultivationSpaces, setCultivationSpaces] = useState<CultivationSpaceResponse[]>([]);
+  const [selectedSpaceId, setSelectedSpaceId] = useState<number | null>(null);
+  const [spacesLoading, setSpacesLoading] = useState(false);
+  const [spacesError, setSpacesError] = useState<string | null>(null);
+  const [savingSpace, setSavingSpace] = useState(false);
   const [deviceError, setDeviceError] = useState<string | null>(null);
   const [registeringDevice, setRegisteringDevice] = useState(false);
   const [availableCrops, setAvailableCrops] = useState<CropResponse[]>([]);
@@ -129,16 +135,58 @@ export function SetupFlow({
   const step = stage === 'device' ? 1 : stage === 'crop' ? 2 : 3;
   const enteredArea = Number(areaSquareMeters);
   const parsedAreaSquareMeters = convertToSquareMeters(enteredArea, areaUnit);
-  const canRegisterDevice = serialCode.length === 6
-    && spaceName.trim().length > 0
+  const hasNewSpaceDetails = spaceName.trim().length > 0
     && spaceType.trim().length > 0
     && Number.isFinite(enteredArea)
     && Number.isFinite(parsedAreaSquareMeters)
     && parsedAreaSquareMeters > 0;
+  const canRegisterDevice = serialCode.length === 6 && (selectedSpaceId !== null || hasNewSpaceDetails);
+  const spaceOptions = [
+    { label: '새 공간 입력', value: 'new' },
+    ...cultivationSpaces.map((space) => ({ label: `${space.name} · ${space.spaceType}`, value: String(space.id) })),
+  ];
 
   const updateSerialCode = (value: string) => {
     setSerialCode(value.replace(/\D/g, '').slice(0, 6));
     setDeviceError(null);
+  };
+
+  const selectSpace = (value: string) => {
+    const selectedSpace = cultivationSpaces.find((space) => String(space.id) === value);
+    setDeviceError(null);
+    if (!selectedSpace) {
+      setSelectedSpaceId(null);
+      return;
+    }
+    setSelectedSpaceId(selectedSpace.id);
+    setSpaceName(selectedSpace.name);
+    setSpaceType(selectedSpace.spaceType as (typeof spaceTypeOptions)[number]['value']);
+    setAreaSquareMeters(String(selectedSpace.areaSquareMeters));
+    setAreaUnit('SQUARE_METERS');
+  };
+
+  const saveSpace = async () => {
+    const parsedArea = convertToSquareMeters(Number(areaSquareMeters), areaUnit);
+    if (!spaceName.trim() || !spaceType.trim() || !Number.isFinite(parsedArea) || parsedArea <= 0) {
+      setDeviceError('새 공간의 이름, 유형, 면적을 모두 입력해 주세요.');
+      return;
+    }
+    setDeviceError(null);
+    setSavingSpace(true);
+    try {
+      const createdSpace = await createCultivationSpace({
+        name: spaceName.trim(),
+        spaceType: spaceType.trim(),
+        areaSquareMeters: parsedArea,
+      });
+      setCultivationSpaces((spaces) => [...spaces, createdSpace]);
+      setSelectedSpaceId(createdSpace.id);
+      setAreaUnit('SQUARE_METERS');
+    } catch (requestError) {
+      setDeviceError(requestError instanceof Error ? requestError.message : '공간을 저장하지 못했습니다.');
+    } finally {
+      setSavingSpace(false);
+    }
   };
 
   const submitDevice = async () => {
@@ -148,15 +196,15 @@ export function SetupFlow({
       return;
     }
     const parsedArea = convertToSquareMeters(Number(areaSquareMeters), areaUnit);
-    if (!spaceName.trim()) {
+    if (selectedSpaceId === null && !spaceName.trim()) {
       setDeviceError('공간 이름을 입력해 주세요.');
       return;
     }
-    if (!spaceType.trim()) {
+    if (selectedSpaceId === null && !spaceType.trim()) {
       setDeviceError('공간 유형을 입력해 주세요.');
       return;
     }
-    if (!Number.isFinite(parsedArea) || parsedArea <= 0) {
+    if (selectedSpaceId === null && (!Number.isFinite(parsedArea) || parsedArea <= 0)) {
       setDeviceError('공간 면적은 0보다 큰 숫자로 입력해 주세요.');
       return;
     }
@@ -164,12 +212,14 @@ export function SetupFlow({
     setDeviceError(null);
     setRegisteringDevice(true);
     try {
-      const registered = await registerDevice({
-        serialCode,
-        spaceName: spaceName.trim(),
-        spaceType: spaceType.trim(),
-        areaSquareMeters: parsedArea,
-      });
+      const registered = await registerDevice(selectedSpaceId !== null
+        ? { serialCode, spaceId: selectedSpaceId }
+        : {
+          serialCode,
+          spaceName: spaceName.trim(),
+          spaceType: spaceType.trim(),
+          areaSquareMeters: parsedArea,
+        });
       onDeviceRegistered(registered);
       onNext();
     } catch (requestError) {
@@ -178,6 +228,26 @@ export function SetupFlow({
       setRegisteringDevice(false);
     }
   };
+
+  useEffect(() => {
+    if (stage !== 'device') return undefined;
+    let active = true;
+    setSpacesLoading(true);
+    setSpacesError(null);
+    void getCultivationSpaces()
+      .then((spaces) => {
+        if (active) setCultivationSpaces(spaces);
+      })
+      .catch((error) => {
+        if (active) setSpacesError(error instanceof Error ? error.message : '공간 목록을 불러오지 못했습니다.');
+      })
+      .finally(() => {
+        if (active) setSpacesLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [stage]);
 
   useEffect(() => {
     if (stage !== 'setup') {
@@ -263,12 +333,27 @@ export function SetupFlow({
           {stage === 'device' ? (
             <View style={styles.deviceSetupContent}>
               <View style={styles.setupFieldGrid}>
+                {spacesLoading ? <Text style={styles.spaceHelpText}>등록된 공간을 불러오는 중입니다.</Text> : null}
+                {!spacesLoading && cultivationSpaces.length > 0 ? (
+                  <View style={styles.field}>
+                    <Text style={styles.fieldLabel}>기존 공간</Text>
+                    <SelectField
+                      disabled={registeringDevice}
+                      onChange={selectSpace}
+                      options={spaceOptions}
+                      placeholder="새 공간을 입력하세요"
+                      value={selectedSpaceId === null ? 'new' : String(selectedSpaceId)}
+                    />
+                    <Text style={styles.spaceHelpText}>기존 공간을 선택하면 새 공간을 만들지 않고 기기를 연결합니다.</Text>
+                  </View>
+                ) : null}
+                {spacesError ? <Text style={styles.spaceHelpText}>{spacesError}</Text> : null}
                 <View style={styles.field}>
                   <Text style={styles.fieldLabel}>공간 이름</Text>
                   <TextInput
                     editable={!registeringDevice}
                     maxLength={100}
-                    onChangeText={(value) => { setSpaceName(value); setDeviceError(null); }}
+                    onChangeText={(value) => { setSelectedSpaceId(null); setSpaceName(value); setDeviceError(null); }}
                     placeholder="예: 부산 도심 옥상 A"
                     placeholderTextColor={palette.muted}
                     style={styles.input}
@@ -279,7 +364,7 @@ export function SetupFlow({
                   <Text style={styles.fieldLabel}>공간 유형</Text>
                   <SelectField
                     disabled={registeringDevice}
-                    onChange={(value) => { setSpaceType(value); setDeviceError(null); }}
+                    onChange={(value) => { setSelectedSpaceId(null); setSpaceType(value); setDeviceError(null); }}
                     options={spaceTypeOptions}
                     placeholder="공간 유형을 선택하세요"
                     value={spaceType}
@@ -293,6 +378,7 @@ export function SetupFlow({
                       inputMode="decimal"
                       keyboardType="decimal-pad"
                       onChangeText={(value) => {
+                        setSelectedSpaceId(null);
                         setAreaSquareMeters(value.replace(/[^0-9.]/g, ''));
                         setDeviceError(null);
                       }}
@@ -317,6 +403,11 @@ export function SetupFlow({
                   ) : null}
                 </View>
               </View>
+              <ActionButton
+                disabled={registeringDevice || savingSpace || selectedSpaceId !== null || !hasNewSpaceDetails}
+                label={savingSpace ? '공간 저장 중...' : '새 공간 저장'}
+                onPress={() => void saveSpace()}
+              />
               <View style={styles.registrationGuide}>
                 <Text style={styles.registrationGuideTitle}>공간분석 세트 등록 번호</Text>
                 <Text style={styles.registrationGuideBody}>키트 하단 라벨에 표시된 숫자 여섯 자리를 입력하면 이 공간과 측정 데이터가 연결됩니다.</Text>
@@ -455,6 +546,7 @@ const styles = StyleSheet.create(scaleTypography({
   areaValueInput: { flex: 1 },
   areaUnitSelect: { width: 110 },
   areaConversionText: { ...typeScale.caption, color: palette.greenDark, fontFamily: font },
+  spaceHelpText: { ...typeScale.caption, color: palette.muted, fontFamily: font },
   setupPage: { alignItems: 'center', flexGrow: 1, paddingBottom: 48, paddingHorizontal: 32 },
   setupTopbar: { alignItems: 'center', flexDirection: 'row', maxWidth: 1080, paddingVertical: 24, width: '100%' },
   setupBrand: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 9 },

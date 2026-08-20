@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { glassWebStyle, font } from '../appTheme/glass';
@@ -7,7 +7,8 @@ import { scaleTypography } from '../appTheme/scaleTypography';
 import { typeScale } from '../appTheme/typography';
 import { SensorSummary } from '../components/SensorSummary';
 import { Surface } from '../components/Surface';
-import { sensors } from '../data';
+import type { DeviceResponse } from '../device/deviceApi';
+import { getDeviceSensors, type DeviceSensorStatus } from '../sensor/sensorApi';
 import type { Page } from './types';
 
 const navItems: Array<{ key: Page; label: string }> = [
@@ -19,9 +20,10 @@ const navItems: Array<{ key: Page; label: string }> = [
   { key: 'shop', label: '제품 추가 구매' },
 ];
 
-export function Sidebar({ compact, cropName, onHide, onLogout, onNavigate, page }: {
+export function Sidebar({ compact, cropName, device, onHide, onLogout, onNavigate, page }: {
   compact: boolean;
   cropName: string;
+  device?: DeviceResponse;
   onHide?: () => void;
   onLogout: () => void;
   onNavigate: (page: Page) => void;
@@ -29,6 +31,46 @@ export function Sidebar({ compact, cropName, onHide, onLogout, onNavigate, page 
 }) {
   const [farmInfoOpen, setFarmInfoOpen] = useState(false);
   const [deviceStatusOpen, setDeviceStatusOpen] = useState(false);
+  const [deviceSensors, setDeviceSensors] = useState<DeviceSensorStatus[]>([]);
+  const [sensorsLoading, setSensorsLoading] = useState(false);
+  const [sensorsError, setSensorsError] = useState<string | null>(null);
+  const online = device?.status === 'ONLINE';
+  const connectionStatus = device ? (online ? '정상 연결' : '오프라인') : '기기 정보 없음';
+  const spaceName = device?.space?.name ?? '등록된 공간 없음';
+  const lastSeen = device?.lastSeenAt
+    ? new Date(device.lastSeenAt).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' })
+    : '최근 수신 정보 없음';
+  const farmInfoRows = [
+    { label: '공간 유형', value: device?.space?.spaceType ?? '-' },
+    { label: '공간 면적', value: device?.space ? `${device.space.areaSquareMeters}m²` : '-' },
+    { label: '재배 작물', value: cropName },
+    { label: '등록 기기', value: device?.serialCode ?? '-' },
+    { label: '연결 화분', value: `${device?.pots?.length ?? 0}개` },
+    { label: '마지막 수신', value: lastSeen },
+  ];
+
+  useEffect(() => {
+    if (!device?.id) {
+      setDeviceSensors([]);
+      return undefined;
+    }
+    let active = true;
+    setSensorsLoading(true);
+    setSensorsError(null);
+    void getDeviceSensors(device.id)
+      .then((response) => {
+        if (active) setDeviceSensors(response.sensors);
+      })
+      .catch((error) => {
+        if (active) setSensorsError(error instanceof Error ? error.message : '센서 상태를 불러오지 못했습니다.');
+      })
+      .finally(() => {
+        if (active) setSensorsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [device?.id]);
 
   if (compact) {
     return (
@@ -78,11 +120,11 @@ export function Sidebar({ compact, cropName, onHide, onLogout, onNavigate, page 
       <View style={styles.sidebarBottom}>
         <View style={styles.devicePanel}>
           <View style={styles.deviceStatusRow}>
-            <View style={styles.onlineDot} />
-            <Text style={styles.deviceStatus}>정상 연결</Text>
+            <View style={[styles.onlineDot, !online && styles.offlineDot]} />
+            <Text style={styles.deviceStatus}>{connectionStatus}</Text>
           </View>
-          <Text style={styles.deviceTitle}>내 스마트팜</Text>
-          <Text style={styles.deviceDetail}>마지막 수신 방금 전</Text>
+          <Text style={styles.deviceTitle}>{spaceName}</Text>
+          <Text style={styles.deviceDetail}>{lastSeen}</Text>
         </View>
         <Pressable accessibilityRole="button" onPress={() => setFarmInfoOpen(true)} style={({ pressed }) => [styles.sidebarActionButton, pressed && styles.pressed]}>
           <Text style={styles.sidebarActionText}>스마트팜 정보 보기</Text>
@@ -101,25 +143,23 @@ export function Sidebar({ compact, cropName, onHide, onLogout, onNavigate, page 
         <Surface style={styles.infoModal}>
           <View style={styles.modalHeader}>
             <View style={styles.modalHeaderCopy}>
-              <Text style={styles.modalTitle}>내 스마트팜</Text>
+              <Text style={styles.modalTitle}>{spaceName}</Text>
             </View>
             <Pressable onPress={() => setFarmInfoOpen(false)} style={styles.modalClose}>
               <Text style={styles.modalCloseText}>닫기</Text>
             </Pressable>
           </View>
           <View style={styles.farmStatusSummary}>
-            <View style={styles.onlineDot} />
+            <View style={[styles.onlineDot, !online && styles.offlineDot]} />
             <View style={styles.farmStatusCopy}>
-              <Text style={styles.farmStatusTitle}>모든 장치가 정상 작동 중입니다</Text>
-              <Text style={styles.farmStatusBody}>등록된 센서에서 환경 데이터를 정상적으로 받고 있어요.</Text>
+              <Text style={styles.farmStatusTitle}>{connectionStatus}</Text>
+              <Text style={styles.farmStatusBody}>{device ? '기기와 연결된 화분 정보를 API에서 불러왔습니다.' : '등록된 기기 정보를 불러오지 못했습니다.'}</Text>
             </View>
           </View>
           <View style={styles.productInfoList}>
-            <View style={styles.productInfoRow}><Text style={styles.productInfoLabel}>농장 이름</Text><Text style={styles.productInfoValue}>내 스마트팜</Text></View>
-            <View style={styles.productInfoRow}><Text style={styles.productInfoLabel}>재배 작물</Text><Text style={styles.productInfoValue}>{cropName}</Text></View>
-            <View style={styles.productInfoRow}><Text style={styles.productInfoLabel}>등록 기기</Text><Text style={styles.productInfoValue}>TerraByte Hub 01</Text></View>
-            <View style={styles.productInfoRow}><Text style={styles.productInfoLabel}>연결 센서</Text><Text style={styles.productInfoValue}>7개</Text></View>
-            <View style={styles.productInfoRow}><Text style={styles.productInfoLabel}>마지막 동기화</Text><Text style={styles.productInfoValue}>방금 전</Text></View>
+            {farmInfoRows.map((row) => (
+              <View key={row.label} style={styles.productInfoRow}><Text style={styles.productInfoLabel}>{row.label}</Text><Text style={styles.productInfoValue}>{row.value}</Text></View>
+            ))}
           </View>
         </Surface>
       </View>
@@ -135,7 +175,9 @@ export function Sidebar({ compact, cropName, onHide, onLogout, onNavigate, page 
               <Text style={styles.modalCloseText}>닫기</Text>
             </Pressable>
           </View>
-          <SensorSummary sensors={sensors} statusLabel="정상 연결" />
+          {sensorsLoading ? <Text style={styles.sensorStatusText}>센서 상태를 불러오는 중입니다.</Text> : null}
+          {!sensorsLoading && sensorsError ? <Text style={styles.sensorStatusText}>{sensorsError}</Text> : null}
+          {!sensorsLoading && !sensorsError ? <SensorSummary sensors={deviceSensors} statusLabel={connectionStatus} /> : null}
         </Surface>
       </View>
     </Modal>
@@ -161,9 +203,11 @@ const styles = StyleSheet.create(scaleTypography({
   devicePanel: { backgroundColor: palette.panelMuted, borderColor: palette.line, borderRadius: 10, borderWidth: 1, padding: 14 },
   deviceStatusRow: { alignItems: 'center', flexDirection: 'row', gap: 7 },
   onlineDot: { backgroundColor: '#3aad70', borderRadius: 999, height: 7, width: 7 },
+  offlineDot: { backgroundColor: palette.muted },
   deviceStatus: { ...typeScale.caption, color: palette.greenDark, fontFamily: font },
   deviceTitle: { ...typeScale.bodyStrong, color: palette.text, fontFamily: font, fontWeight: '700', marginTop: 8 },
   deviceDetail: { ...typeScale.caption, color: palette.muted, fontFamily: font, marginTop: 5 },
+  sensorStatusText: { ...typeScale.body, color: palette.muted, fontFamily: font },
   sidebarActionButton: { alignItems: 'center', borderColor: palette.line, borderRadius: 8, borderWidth: 1, minHeight: 42, justifyContent: 'center', paddingHorizontal: 12, paddingVertical: 7 },
   sidebarActionText: { ...typeScale.caption, color: palette.greenDark, fontFamily: font, fontWeight: '700' },
   sidebarActionTextMuted: { ...typeScale.caption, color: palette.secondary, fontFamily: font, fontWeight: '700' },
