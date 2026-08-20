@@ -10,6 +10,8 @@ public interface MeasurementStore {
 
     Optional<TelemetrySample> findLatest(long potId);
 
+    List<TelemetrySample> findSamples(long potId, Instant start);
+
     List<MeasurementPoint> findPoints(
             long potId,
             MeasurementMetric metric,
