@@ -1,3 +1,6 @@
+import type { EnvironmentScore, LatestMeasurements, MeasurementSeries, ScoreFactor } from './measurement/measurementApi';
+import type { SoilRecommendation } from './soil/soilApi';
+
 export type Crop = {
   code: string;
   name: string;
@@ -35,6 +38,111 @@ export type ShopProduct = {
   price: number;
   badge?: string;
 };
+
+export const dashboardSpace = {
+  name: '부산 스마트팜 옥상 A',
+  meta: '옥상 · 42m² · 자동화 · 공간분석 키트 1대 · 토양분석 키트 1대',
+  operatingLabel: '작물환경 모니터링 중',
+  flow: [
+    { label: '공간 등록', state: '완료' },
+    { label: '공간 진단', state: '완료' },
+    { label: '환경 모니터링', state: '운영 중' },
+  ],
+} as const;
+
+export const dashboardChartMetrics = [
+  { key: 'air_temperature_c', label: '온도', color: '#d9822b' },
+  { key: 'air_humidity_pct', label: '습도', color: '#2b8fae' },
+  { key: 'plant_light_ppfd_umol_m2_s', label: '조도', color: '#e0b23a' },
+  { key: 'soil_moisture_pct', label: '토양 수분', color: '#3fae6f' },
+  { key: 'soil_temperature_c', label: '토양 온도', color: '#8b6f47' },
+] as const;
+
+export const liveMetricDefinitions = [
+  { key: 'air_temperature_c', label: '온도', unit: '℃', color: '#d9822b', rangeLabel: '최근 1시간' },
+  { key: 'air_humidity_pct', label: '습도', unit: '%', color: '#2b8fae', rangeLabel: '최근 1시간' },
+  { key: 'plant_light_ppfd_umol_m2_s', label: '조도', unit: ' PPFD', color: '#e0b23a', rangeLabel: '최근 1시간' },
+  { key: 'soil_moisture_pct', label: '토양 수분', unit: '%', color: '#3fae6f', rangeLabel: '최근 1시간' },
+  { key: 'soil_temperature_c', label: '토양 온도', unit: '℃', color: '#8b6f47', rangeLabel: '최근 1시간' },
+] as const;
+
+export const fallbackSoilTemperatureReport = {
+  label: '토양 온도',
+  unit: '℃',
+  avg24h: 22.8,
+  axisMax: 35,
+  status: 'REFERENCE' as const,
+  finding: '현재 토양 온도는 22.8℃입니다. 뿌리 주변 온도 변화를 확인하는 참고 지표입니다.',
+  recommendation: '급격한 온도 변화가 없도록 직사광선과 냉기를 피하고 배지 온도를 함께 관찰하세요.',
+} as const;
+
+export const historyRecords = [
+  { date: '2026. 07. 22', score: 82, isInitial: false, summary: '조도 보완 후 전환 적합도 상승', issues: '습도 관리 필요' },
+  { date: '2026. 07. 15', score: 75, isInitial: false, summary: '토양분석 키트 연결 및 관리 기준 설정', issues: '조도·습도 보완 필요' },
+  { date: '2026. 07. 08', score: 68, isInitial: true, summary: '옥상 공간 현장 점검 및 환경 조건 분석', issues: '조도·습도·배수 보완 필요' },
+] as const;
+
+export const historyComparison = {
+  title: '보조 조명 설치 후 조도 점수가 가장 크게 개선됐습니다',
+  body: '일평균 조도가 9,600lux에서 11,800lux로 상승했고, 권장 범위 미달 시간은 하루 8.2시간에서 4.6시간으로 줄었습니다.',
+  before: 54,
+  after: 71,
+} as const;
+
+export const managementTasks = [
+  {
+    id: 'grow-light',
+    priority: '높음',
+    title: '성장등 작동 상태 확인',
+    body: '현재 조도가 8,000lux까지 낮아졌습니다. 조명 전원과 작물 사이 30cm 거리를 확인하세요.',
+    time: '예상 5분',
+  },
+  {
+    id: 'humidity',
+    priority: '보통',
+    title: '오후 습도 조정',
+    body: '관수 직후 환기를 10분 권장하고, 습도가 50% 이상 회복하는지 확인하세요.',
+    time: '예상 10분',
+  },
+] as const;
+
+export const cultivationCriteria = [
+  {
+    label: '현재 단계',
+    title: '유묘기 · 4주차',
+    body: '뿌리가 새 배지에 자리 잡는 기간입니다. 과습과 강한 빛 변화를 피해야 해요.',
+  },
+  {
+    label: '권장 환경',
+    title: '20~26℃ · 55~70%',
+    body: '보조 조명 4시간을 기준으로 관리합니다.',
+  },
+  {
+    label: '다음 점검',
+    title: '3일 후',
+    body: '잎끝, 흙 마름, 줄기 상태를 확인하고 환경을 다시 분석합니다.',
+  },
+] as const;
+
+export const sidebarDeviceInfo = {
+  connectionStatus: '정상 연결',
+  title: '내 스마트팜',
+  detail: '마지막 수신 방금 전',
+  lastSync: '방금 전',
+  farmName: '내 스마트팜',
+  farmStatusTitle: '모든 장치가 정상 작동 중입니다',
+  farmStatusBody: '등록된 센서에서 환경 데이터를 정상적으로 받고 있어요.',
+  registeredDevice: 'TerraByte Hub 01',
+  connectedSensorCount: '7개',
+} as const;
+
+export const getSidebarFarmInfoRows = (cropName: string) => [
+  { label: '농장 이름', value: sidebarDeviceInfo.farmName },
+  { label: '재배 작물', value: cropName },
+  { label: '등록 기기', value: sidebarDeviceInfo.registeredDevice },
+  { label: '연결 센서', value: sidebarDeviceInfo.connectedSensorCount },
+  { label: '마지막 동기화', value: sidebarDeviceInfo.lastSync },
+];
 
 export const crops: Crop[] = [
   { code: 'cherry_tomato', name: '방울토마토', emoji: '🍅', desc: '초보자에게 인기 있는 실내 작물' },
@@ -148,7 +256,7 @@ export const sensors: Sensor[] = [
   { label: '토양 온도 센서', model: 'DS18B20' },
 ];
 
-export const factorProductMap: Partial<Record<'temperature' | 'humidity' | 'plantLight', string[]>> = {
+export const factorProductMap: Partial<Record<ScoreFactor['key'], string[]>> = {
   plantLight: ['grow-light'],
   humidity: ['watering-kit'],
 };
@@ -308,69 +416,6 @@ export const dailyAvg = [
   { label: '토양 수분', emoji: '🪴', value: '36%', sub: '24h 평균 · 최저 31 · 최고 42' },
 ];
 
-export const latest = [
-  {
-    label: '온도',
-    emoji: '🌡️',
-    value: '24.5℃',
-    baseValue: 24.5,
-    unit: '℃',
-    decimals: 1,
-    jitter: 0.3,
-    color: '#d9822b',
-    sub: '최적 범위 (20~26℃)',
-    sparkline: [24.1, 24.2, 24.1, 24.3, 24.4, 24.3, 24.5, 24.4, 24.6, 24.5, 24.4, 24.5],
-  },
-  {
-    label: '습도',
-    emoji: '💧',
-    value: '45%',
-    baseValue: 45,
-    unit: '%',
-    decimals: 0,
-    jitter: 2,
-    color: '#2b8fae',
-    sub: '최적 대비 15% 부족',
-    sparkline: [47, 46, 47, 46, 45, 46, 44, 45, 46, 45, 44, 45],
-  },
-  {
-    label: '조도',
-    emoji: '☀️',
-    value: '8,000 lux',
-    baseValue: 8000,
-    unit: 'lux',
-    decimals: 0,
-    jitter: 250,
-    color: '#e0b23a',
-    sub: '최적 대비 7,000 lux 부족',
-    sparkline: [7650, 7820, 7900, 7750, 8010, 8150, 8070, 8240, 8100, 7950, 8120, 8000],
-  },
-  {
-    label: '토양 수분',
-    emoji: '🪴',
-    value: '38%',
-    baseValue: 38,
-    unit: '%',
-    decimals: 0,
-    jitter: 1,
-    color: '#3fae6f',
-    sub: '최적 범위 (30~45%)',
-    sparkline: [39, 39, 38, 39, 38, 38, 37, 38, 38, 39, 38, 38],
-  },
-  {
-    label: '토양 온도',
-    emoji: '',
-    value: '22.8℃',
-    baseValue: 22.8,
-    unit: '℃',
-    decimals: 1,
-    jitter: 0.2,
-    color: '#8b6f47',
-    sub: '최적 범위 (18~25℃)',
-    sparkline: [22.4, 22.5, 22.5, 22.6, 22.7, 22.8, 22.7, 22.9, 22.8, 22.8, 22.9, 22.8],
-  },
-];
-
 export const rangeTabs: Array<{ key: ChartRange; label: string }> = [
   { key: '1h', label: '1시간' },
   { key: '24h', label: '24시간' },
@@ -384,3 +429,335 @@ export const chartMetrics = [
   { label: '조도', unit: 'lux', color: '#e0b23a', seed: 5, amp: 30, mid: 55 },
   { label: '토양 수분', unit: '%', color: '#3fae6f', seed: 7, amp: 14, mid: 50 },
 ];
+
+export const storybookAnalysisScore: EnvironmentScore = {
+  deviceId: 1,
+  cropCode: 'TOMATO',
+  cropName: '방울토마토',
+  total: 68,
+  grade: 'NORMAL',
+  measuredAt: '2026-07-29T09:00:00+09:00',
+  formula: 'mock formula',
+  factors: [
+    {
+      key: 'plantLight',
+      label: '조도',
+      unit: 'PPFD',
+      current: 80,
+      optimalMin: 300,
+      optimalMax: 600,
+      status: 'LOW',
+      gap: 220,
+      score: 42,
+    },
+    {
+      key: 'humidity',
+      label: '습도',
+      unit: '%',
+      current: 46,
+      optimalMin: 50,
+      optimalMax: 70,
+      status: 'LOW',
+      gap: 4,
+      score: 70,
+    },
+  ],
+};
+
+export const storybookAnalysisMeasurements: LatestMeasurements = {
+  deviceId: 1,
+  hardwareDeviceId: 'TB-STORY-001',
+  observedAt: '2026-07-29T09:00:00+09:00',
+  sequence: 42,
+  measurements: {
+    soilMoisturePct: 34,
+    soilMoistureRawAdc: 1840,
+    airTemperatureC: 24.6,
+    airHumidityPct: 46,
+    plantLightPpfdUmolM2S: 80,
+    soilTemperatureC: 21.4,
+  },
+  quality: {
+    soilSensorValid: true,
+    airSensorValid: true,
+    lightSensorValid: true,
+  },
+};
+
+export const storybookDashboardScore: EnvironmentScore = {
+  deviceId: 1,
+  cropCode: 'TOMATO',
+  cropName: '방울토마토',
+  total: 68,
+  grade: 'NORMAL',
+  measuredAt: '2026-07-29T09:00:00+09:00',
+  formula: 'mock formula',
+  factors: [
+    {
+      key: 'plantLight',
+      label: '조도',
+      unit: 'PPFD',
+      current: 80,
+      optimalMin: 300,
+      optimalMax: 600,
+      status: 'LOW',
+      gap: 220,
+      score: 42,
+    },
+    {
+      key: 'humidity',
+      label: '습도',
+      unit: '%',
+      current: 46,
+      optimalMin: 50,
+      optimalMax: 70,
+      status: 'LOW',
+      gap: 4,
+      score: 70,
+    },
+  ],
+};
+
+export const storybookDashboardMeasurements: LatestMeasurements = {
+  deviceId: 1,
+  hardwareDeviceId: 'TB-STORY-001',
+  observedAt: '2026-07-29T09:00:00+09:00',
+  sequence: 42,
+  measurements: {
+    soilMoisturePct: 34,
+    soilMoistureRawAdc: 1840,
+    airTemperatureC: 24.6,
+    airHumidityPct: 46,
+    plantLightPpfdUmolM2S: 80,
+    soilTemperatureC: 21.4,
+  },
+  quality: {
+    soilSensorValid: true,
+    airSensorValid: true,
+    lightSensorValid: true,
+  },
+};
+
+export const storybookDashboardSeries: MeasurementSeries = {
+  deviceId: 1,
+  metric: 'soil_temperature_c',
+  unit: '℃',
+  range: '24h',
+  points: Array.from({ length: 24 }, (_, index) => ({
+    time: new Date(Date.UTC(2026, 6, 28, index)).toISOString(),
+    value: 21.8 + Math.sin(index / 4) * 0.9,
+  })),
+};
+
+export const storybookGuideScore: EnvironmentScore = {
+  deviceId: 1,
+  cropCode: 'TOMATO',
+  cropName: '방울토마토',
+  total: 68,
+  grade: 'NORMAL',
+  measuredAt: '2026-07-29T09:00:00+09:00',
+  formula: 'mock formula',
+  factors: [
+    {
+      key: 'plantLight',
+      label: '조도',
+      unit: 'PPFD',
+      current: 80,
+      optimalMin: 300,
+      optimalMax: 600,
+      status: 'LOW',
+      gap: 220,
+      score: 42,
+    },
+    {
+      key: 'humidity',
+      label: '습도',
+      unit: '%',
+      current: 46,
+      optimalMin: 50,
+      optimalMax: 70,
+      status: 'LOW',
+      gap: 4,
+      score: 70,
+    },
+  ],
+};
+
+export const storybookGuideMeasurements: LatestMeasurements = {
+  deviceId: 1,
+  hardwareDeviceId: 'TB-STORY-001',
+  observedAt: '2026-07-29T09:00:00+09:00',
+  sequence: 42,
+  measurements: {
+    soilMoisturePct: 34,
+    soilMoistureRawAdc: 1840,
+    airTemperatureC: 24.6,
+    airHumidityPct: 46,
+    plantLightPpfdUmolM2S: 80,
+    soilTemperatureC: 21.4,
+  },
+  quality: {
+    soilSensorValid: true,
+    airSensorValid: true,
+    lightSensorValid: true,
+  },
+};
+
+export const storybookGuideSoilRecommendation: SoilRecommendation = {
+  deviceId: 1,
+  cropCode: 'cherry_tomato',
+  cropName: '방울토마토',
+  targetCondition: 'NORMAL',
+  profileId: 'cherry-tomato-normal-v1',
+  materials: [
+    { name: '원예용 상토', parts: 5, role: '수분·양분 보유, 뿌리 지지' },
+    { name: '펄라이트', parts: 1, role: '배수·통기 보완, 배지 다짐 완화' },
+  ],
+  mixRatio: '5:1',
+  mixRatioText: '원예용 상토 5 : 펄라이트 1',
+  reason: '일정한 수분 공급을 유지하면서 배수와 통기성을 보완한다.',
+  environmentSignals: [
+    '관수 후 토양 수분이 상승함',
+    '이후 수분이 점진적으로 감소함',
+    '배수구에서 물이 정상적으로 빠짐',
+  ],
+  preChecks: [],
+  cautions: [
+    '상토에 펄라이트가 충분하면 추가량을 줄이거나 생략한다.',
+    '받침에 고인 물은 제거한다.',
+  ],
+  assumptionNotice: [
+    '작물의 일반 생육 특성과 현재 환경정보에 기반한 가정값입니다.',
+    '배합비는 공식 표준이 아닌 서비스 내부 추론값입니다.',
+  ],
+};
+
+export const storybookLiveScore: EnvironmentScore = {
+  deviceId: 1,
+  cropCode: 'TOMATO',
+  cropName: '방울토마토',
+  total: 86,
+  grade: 'GOOD',
+  measuredAt: '2026-07-29T09:00:00+09:00',
+  formula: 'mock formula',
+  factors: [
+    {
+      key: 'temperature',
+      label: '온도',
+      unit: '°C',
+      current: 24.6,
+      optimalMin: 20,
+      optimalMax: 28,
+      status: 'OK',
+      gap: 0,
+      score: 92,
+    },
+    {
+      key: 'humidity',
+      label: '습도',
+      unit: '%',
+      current: 61,
+      optimalMin: 50,
+      optimalMax: 70,
+      status: 'OK',
+      gap: 0,
+      score: 88,
+    },
+    {
+      key: 'plantLight',
+      label: '조도',
+      unit: 'PPFD',
+      current: 420,
+      optimalMin: 300,
+      optimalMax: 600,
+      status: 'OK',
+      gap: 0,
+      score: 78,
+    },
+  ],
+};
+
+export const storybookLiveMeasurements: LatestMeasurements = {
+  deviceId: 1,
+  hardwareDeviceId: 'TB-STORY-001',
+  observedAt: '2026-07-29T09:00:00+09:00',
+  sequence: 42,
+  measurements: {
+    soilMoisturePct: 56,
+    soilMoistureRawAdc: 1840,
+    airTemperatureC: 24.6,
+    airHumidityPct: 61,
+    plantLightPpfdUmolM2S: 420,
+    soilTemperatureC: 21.4,
+  },
+  quality: {
+    soilSensorValid: true,
+    airSensorValid: true,
+    lightSensorValid: true,
+  },
+};
+
+export const storybookLiveSeries: MeasurementSeries = {
+  deviceId: 1,
+  metric: 'soil_temperature_c',
+  unit: '℃',
+  range: '1h',
+  points: Array.from({ length: 24 }, (_, index) => ({
+    time: new Date(Date.UTC(2026, 6, 29, 0, index * 3)).toISOString(),
+    value: 21.4 + Math.sin(index / 4) * 0.8,
+  })),
+};
+
+export const storybookShopScore: EnvironmentScore = {
+  deviceId: 1,
+  cropCode: 'TOMATO',
+  cropName: '방울토마토',
+  total: 68,
+  grade: 'NORMAL',
+  measuredAt: '2026-07-29T09:00:00+09:00',
+  formula: 'mock formula',
+  factors: [
+    {
+      key: 'plantLight',
+      label: '조도',
+      unit: 'PPFD',
+      current: 80,
+      optimalMin: 300,
+      optimalMax: 600,
+      status: 'LOW',
+      gap: 220,
+      score: 42,
+    },
+    {
+      key: 'humidity',
+      label: '습도',
+      unit: '%',
+      current: 46,
+      optimalMin: 50,
+      optimalMax: 70,
+      status: 'LOW',
+      gap: 4,
+      score: 70,
+    },
+  ],
+};
+
+export const storybookShopMeasurements: LatestMeasurements = {
+  deviceId: 1,
+  hardwareDeviceId: 'TB-STORY-001',
+  observedAt: '2026-07-29T09:00:00+09:00',
+  sequence: 42,
+  measurements: {
+    soilMoisturePct: 34,
+    soilMoistureRawAdc: 1840,
+    airTemperatureC: 24.6,
+    airHumidityPct: 46,
+    plantLightPpfdUmolM2S: 80,
+    soilTemperatureC: null,
+  },
+  quality: {
+    soilSensorValid: true,
+    airSensorValid: true,
+    lightSensorValid: true,
+  },
+};

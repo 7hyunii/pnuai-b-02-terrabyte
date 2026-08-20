@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { controlTextTokens, controlTokens } from '../../appTheme/controls';
@@ -12,21 +12,16 @@ import { SectionHeader } from '../../components/SectionHeader';
 import { SensorSummary } from '../../components/SensorSummary';
 import { SuitabilityFormulaModal } from '../../components/SuitabilityFormulaModal';
 import { Surface } from '../../components/Surface';
-import { chartMetrics, crops, factors, sensors } from '../../data';
+import { crops, dashboardChartMetrics } from '../../data';
+import type { DeviceResponse } from '../../device/deviceApi';
 import type { Page } from '../../navigation/types';
+import { getDeviceSensors, type DeviceSensorStatus } from '../../sensor/sensorApi';
 import {
   useDeviceEnvironment,
   useMeasurementSeries,
 } from '../../shared/device-environment/DeviceEnvironmentProvider';
 import { getGradeLabel, getIssueFactors } from '../../shared/factorPresentation';
 import { useDisclosure } from '../../shared/hooks/useDisclosure';
-
-function makeWavePoints(seed: number, amplitude: number, center: number): number[] {
-  return Array.from(
-    { length: 36 },
-    (_, index) => center + Math.sin(index * 0.42 + seed) * amplitude + Math.sin(index * 0.13) * 6,
-  );
-}
 
 function makeAxisLabels(points: Array<{ time: string }>, range: '1h' | '24h' | '7d' | '30d'): string[] {
   const labelCount = Math.min(5, points.length);
@@ -43,26 +38,53 @@ function makeAxisLabels(points: Array<{ time: string }>, range: '1h' | '24h' | '
   });
 }
 
-const environmentChartMetrics = [
-  ...chartMetrics,
-  { label: '토양 온도', color: '#8b6f47', seed: 2, amp: 1.1, mid: 22 },
-];
-
 export function DashboardScreen({
   compact,
+  device,
   onNavigate,
   selectedCrop,
 }: {
   compact: boolean;
+  device?: DeviceResponse;
   onNavigate: (page: Page) => void;
   selectedCrop: number;
 }) {
   const currentCrop = crops[selectedCrop] ?? crops[0];
   const [chartRange, setChartRange] = useState<'1h' | '24h' | '7d' | '30d'>('24h');
   const [selectedChartMetric, setSelectedChartMetric] = useState('all');
+  const [kitSensors, setKitSensors] = useState<DeviceSensorStatus[]>([]);
+  const [kitSensorsLoading, setKitSensorsLoading] = useState(false);
+  const [kitSensorsError, setKitSensorsError] = useState<string | null>(null);
   const { score: scoreData, measurements: latestData } = useDeviceEnvironment();
+  const airTemperatureSeries = useMeasurementSeries('air_temperature_c', chartRange);
+  const airHumiditySeries = useMeasurementSeries('air_humidity_pct', chartRange);
+  const plantLightSeries = useMeasurementSeries('plant_light_ppfd_umol_m2_s', chartRange);
+  const soilMoistureSeries = useMeasurementSeries('soil_moisture_pct', chartRange);
   const soilTemperatureSeries = useMeasurementSeries('soil_temperature_c', chartRange);
   const formulaDisclosure = useDisclosure();
+
+  useEffect(() => {
+    if (!device?.id) {
+      setKitSensors([]);
+      return undefined;
+    }
+    let active = true;
+    setKitSensorsLoading(true);
+    setKitSensorsError(null);
+    void getDeviceSensors(device.id)
+      .then((response) => {
+        if (active) setKitSensors(response.sensors);
+      })
+      .catch((error) => {
+        if (active) setKitSensorsError(error instanceof Error ? error.message : '키트 상태를 불러오지 못했습니다.');
+      })
+      .finally(() => {
+        if (active) setKitSensorsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [device?.id]);
 
   const soilMoisture = latestData?.measurements.soilMoisturePct;
   const soilTemperature = latestData?.measurements.soilTemperatureC;
@@ -96,24 +118,46 @@ export function DashboardScreen({
       detail: realtimeStatus(soilTemperature),
     },
   ];
-  const displayFactors = scoreData?.factors ?? factors.slice(0, 3);
+  const displayFactors = scoreData?.factors ?? [];
+  const missingScoreFactors = [
+    { key: 'temperature', label: '온도', unit: '℃' },
+    { key: 'humidity', label: '습도', unit: '%' },
+    { key: 'plantLight', label: '조도', unit: 'PPFD' },
+    { key: 'soilMoisture', label: '토양 수분', unit: '%' },
+    { key: 'soilTemperature', label: '토양 온도', unit: '℃' },
+  ].filter(({ key }) => !displayFactors.some((factor) => factor.key === key));
   const issueFactors = getIssueFactors(scoreData?.factors ?? []);
   const gradeText = getGradeLabel(scoreData?.grade);
-  const soilMoistureValue = soilMoisture == null ? '--' : `${soilMoisture.toLocaleString('ko-KR')}%`;
-  const soilMoistureInRange = soilMoisture != null && soilMoisture >= 30 && soilMoisture <= 45;
-  const soilTemperatureValue = soilTemperature == null ? '--' : `${soilTemperature.toLocaleString('ko-KR', { maximumFractionDigits: 1 })}℃`;
-  const chartSeries = environmentChartMetrics
+  const spaceName = device?.space?.name ?? '등록된 공간 없음';
+  const spaceMeta = device?.space
+    ? `${device.space.spaceType} · ${device.space.areaSquareMeters}m² · 등록 기기 ${device.serialCode}`
+    : '공간 정보를 불러오는 중입니다.';
+  const deviceOnline = device?.status === 'ONLINE';
+  const operatingLabel = !device ? '기기 정보 확인 중' : deviceOnline ? '기기 연결됨' : '기기 오프라인';
+  const environmentActive = Boolean(scoreData || latestData);
+  const flow = [
+    { label: '공간 등록', state: device?.space ? '완료' : '대기' },
+    { label: '기기 연결', state: device ? (deviceOnline ? '정상' : '오프라인') : '대기' },
+    { label: '환경 모니터링', state: environmentActive ? '수신 중' : '수신 대기' },
+  ];
+  const measurementSeriesByMetric = {
+    air_temperature_c: airTemperatureSeries,
+    air_humidity_pct: airHumiditySeries,
+    plant_light_ppfd_umol_m2_s: plantLightSeries,
+    soil_moisture_pct: soilMoistureSeries,
+    soil_temperature_c: soilTemperatureSeries,
+  };
+  const chartSeries = dashboardChartMetrics
     .map((metric) => ({
-      label: metric.label,
-      color: metric.color,
-      values: metric.label === '토양 온도'
-        ? soilTemperatureSeries.points.map((point) => point.value)
-        : makeWavePoints(metric.seed, metric.amp, metric.mid),
+      ...metric,
+      points: measurementSeriesByMetric[metric.key].points,
+      values: measurementSeriesByMetric[metric.key].points.map((point) => point.value),
     }))
     .filter((series) => series.values.length >= 2);
   const visibleChartSeries = selectedChartMetric === 'all'
     ? chartSeries
     : chartSeries.filter((series) => series.label === selectedChartMetric);
+  const chartAxisPoints = visibleChartSeries[0]?.points ?? [];
   const chartPeriodLabel = chartRange === '1h' ? '1시간' : chartRange === '24h' ? '24시간' : chartRange === '7d' ? '7일' : '30일';
 
   return (
@@ -122,17 +166,17 @@ export function DashboardScreen({
         <View style={styles.dashboardIdentitySection}>
           <View style={[styles.spaceIdentityTop, compact && styles.stack]}>
             <View style={styles.spaceIdentityCopy}>
-              <Text style={styles.spaceIdentityTitle}>부산 도심 옥상 A</Text>
-              <Text style={styles.spaceIdentityMeta}>옥상 · 42m² · 남동향 · 공간분석 세트 1대 · 토양분석 세트 1대</Text>
+              <Text style={styles.spaceIdentityTitle}>{spaceName}</Text>
+              <Text style={styles.spaceIdentityMeta}>{spaceMeta}</Text>
             </View>
-            <View style={styles.spaceOperatingBadge}><View style={styles.onlineDot} /><Text style={styles.spaceOperatingText}>재배환경 모니터링 중</Text></View>
+            <View style={styles.spaceOperatingBadge}><View style={[styles.onlineDot, !deviceOnline && styles.offlineDot]} /><Text style={styles.spaceOperatingText}>{operatingLabel}</Text></View>
           </View>
           <View style={[styles.serviceFlow, compact && styles.stack]}>
-            <View style={[styles.serviceFlowStep, compact && styles.serviceFlowStepCompact]}><Text style={styles.serviceFlowNumber}>01</Text><Text style={styles.serviceFlowLabel}>공간 등록</Text><Text style={styles.serviceFlowState}>완료</Text></View>
+            <View style={[styles.serviceFlowStep, compact && styles.serviceFlowStepCompact]}><Text style={styles.serviceFlowNumber}>01</Text><Text style={styles.serviceFlowLabel}>{flow[0].label}</Text><Text style={styles.serviceFlowState}>{flow[0].state}</Text></View>
             <View style={[styles.serviceFlowLine, compact && styles.serviceFlowLineCompact]} />
-            <View style={[styles.serviceFlowStep, compact && styles.serviceFlowStepCompact]}><Text style={styles.serviceFlowNumber}>02</Text><Text style={styles.serviceFlowLabel}>공간 진단</Text><Text style={styles.serviceFlowState}>완료</Text></View>
+            <View style={[styles.serviceFlowStep, compact && styles.serviceFlowStepCompact]}><Text style={styles.serviceFlowNumber}>02</Text><Text style={styles.serviceFlowLabel}>{flow[1].label}</Text><Text style={styles.serviceFlowState}>{flow[1].state}</Text></View>
             <View style={[styles.serviceFlowLine, compact && styles.serviceFlowLineCompact]} />
-            <View style={[styles.serviceFlowStepActive, compact && styles.serviceFlowStepCompact]}><Text style={styles.serviceFlowNumberActive}>03</Text><Text style={styles.serviceFlowLabel}>환경 모니터링</Text><Text style={styles.serviceFlowStateActive}>운영 중</Text></View>
+            <View style={[styles.serviceFlowStepActive, compact && styles.serviceFlowStepCompact]}><Text style={styles.serviceFlowNumberActive}>03</Text><Text style={styles.serviceFlowLabel}>{flow[2].label}</Text><Text style={styles.serviceFlowStateActive}>{flow[2].state}</Text></View>
           </View>
         </View>
       </Surface>
@@ -164,12 +208,12 @@ export function DashboardScreen({
         <View style={[styles.dashboardAlertHeader, compact && styles.stack]}>
           <View style={styles.dashboardAlertCopy}>
             <Text style={styles.dashboardAlertEyebrow}>현재 확인이 필요한 항목</Text>
-            <Text style={styles.dashboardAlertTitle}>확인 필요한 환경 {issueFactors.length}건</Text>
+            <Text style={styles.dashboardAlertTitle}>{scoreData ? `확인 필요한 환경 ${issueFactors.length}건` : '환경 점수 수신 대기'}</Text>
           </View>
           <ActionButton label="분석 보고서 보기" onPress={() => onNavigate('analysis')} quiet />
         </View>
         <View style={[styles.dashboardAlertRows, compact && styles.stack]}>
-          {issueFactors.length ? issueFactors.map((factor) => (
+          {!scoreData ? <Text style={styles.dashboardAlertItemBody}>환경 점수 데이터를 불러오는 중이거나 아직 수집된 값이 없습니다.</Text> : issueFactors.length ? issueFactors.map((factor) => (
             <View key={factor.key} style={styles.dashboardAlertItem}>
               <Text style={styles.dashboardAlertItemLabel}>{factor.label} {factor.status === 'LOW' ? '부족' : '초과'}</Text>
               <Text style={styles.dashboardAlertItemValue}>{factor.current.toLocaleString('ko-KR')}{factor.unit}</Text>
@@ -208,7 +252,7 @@ export function DashboardScreen({
           <View style={styles.chartMetricFilter}>
             <Text style={styles.chartMetricFilterLabel}>지표별 보기</Text>
             <View style={styles.chartMetricOptions}>
-              {['전체', ...environmentChartMetrics.map((metric) => metric.label)].map((label) => {
+              {['전체', ...dashboardChartMetrics.map((metric) => metric.label)].map((label) => {
                 const metricKey = label === '전체' ? 'all' : label;
                 const active = selectedChartMetric === metricKey;
                 return (
@@ -228,14 +272,12 @@ export function DashboardScreen({
           <View style={[styles.chartVisual, !compact && styles.chartVisualExpanded]}>
             {visibleChartSeries.length ? (
               <LineChart
-                axisLabels={selectedChartMetric === '토양 온도' && soilTemperatureSeries.points.length >= 2
-                  ? makeAxisLabels(soilTemperatureSeries.points, chartRange)
-                  : ['00:00', '06:00', '12:00', '18:00', '현재']}
+                axisLabels={makeAxisLabels(chartAxisPoints, chartRange)}
                 height={180}
                 series={visibleChartSeries}
               />
             ) : (
-              <Text style={styles.chartStateText}>토양 온도 데이터를 불러오는 중이거나 아직 수집된 값이 없습니다.</Text>
+              <Text style={styles.chartStateText}>환경 데이터를 불러오는 중이거나 아직 수집된 값이 없습니다.</Text>
             )}
           </View>
         </Surface>
@@ -262,31 +304,23 @@ export function DashboardScreen({
               </View>
             </View>
           ))}
-          <View style={styles.tableRow}>
-            <Text style={[styles.tableCellStrong, styles.tableName]}>토양 수분</Text>
-            <Text style={styles.tableCell}>{soilMoistureValue}</Text>
-            <Text style={styles.tableCell}>30~45%</Text>
-            <View style={[styles.statusBadge, !soilMoistureInRange && styles.statusBadgeWarn]}>
-              <Text style={[styles.statusBadgeText, !soilMoistureInRange && styles.statusBadgeTextWarn]}>
-                {soilMoistureInRange ? '적정' : '확인 필요'}
-              </Text>
+          {missingScoreFactors.map((factor) => (
+            <View key={factor.key} style={styles.tableRow}>
+              <Text style={[styles.tableCellStrong, styles.tableName]}>{factor.label}</Text>
+              <Text style={styles.tableCell}>--</Text>
+              <Text style={styles.tableCell}>-- {factor.unit}</Text>
+              <View style={[styles.statusBadge, styles.statusBadgeWarn]}>
+                <Text style={[styles.statusBadgeText, styles.statusBadgeTextWarn]}>수신 대기</Text>
+              </View>
             </View>
-          </View>
-          <View style={styles.tableRow}>
-            <Text style={[styles.tableCellStrong, styles.tableName]}>토양 온도</Text>
-            <Text style={styles.tableCell}>{soilTemperatureValue}</Text>
-            <Text style={styles.tableCell}>18~25℃</Text>
-            <View style={[styles.statusBadge, soilTemperature == null && styles.statusBadgeWarn]}>
-              <Text style={[styles.statusBadgeText, soilTemperature == null && styles.statusBadgeTextWarn]}>
-                {soilTemperature == null ? '확인 필요' : '적정'}
-              </Text>
-            </View>
-          </View>
+          ))}
         </Surface>
 
         <Surface flat style={[styles.deviceStatusPanel, compact && styles.fullWidth]}>
           <SectionHeader title="키트 상태" description="공간분석 세트 + 토양분석 세트" />
-          <SensorSummary sensors={sensors} statusLabel="정상 수신" />
+          {kitSensorsLoading ? <Text style={styles.kitStatusText}>키트 상태를 불러오는 중입니다.</Text> : null}
+          {!kitSensorsLoading && kitSensorsError ? <Text style={styles.kitStatusText}>{kitSensorsError}</Text> : null}
+          {!kitSensorsLoading && !kitSensorsError ? <SensorSummary sensors={kitSensors} statusLabel={operatingLabel} /> : null}
         </Surface>
       </View>
     </View>
@@ -296,6 +330,8 @@ export function DashboardScreen({
 const styles = StyleSheet.create(scaleTypography({
   pressed: { opacity: 0.78 },
   onlineDot: { backgroundColor: '#3aad70', borderRadius: 999, height: 7, width: 7 },
+  offlineDot: { backgroundColor: palette.muted },
+  kitStatusText: { ...typeScale.body, color: palette.muted, fontFamily: font },
   pageBody: { gap: 30, maxWidth: 1320, width: '100%' },
   stack: { flexDirection: 'column' },
   fullWidth: { flexBasis: 'auto', width: '100%' },

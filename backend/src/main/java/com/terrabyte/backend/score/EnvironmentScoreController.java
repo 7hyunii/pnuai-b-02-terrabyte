@@ -32,6 +32,20 @@ public class EnvironmentScoreController {
         return service.latest(Long.parseLong(jwt.getSubject()), potId);
     }
 
+    @GetMapping("/pots/{potId}/crop-recommendations")
+    public java.util.List<CropRecommendationResponse> cropRecommendations(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable long potId) {
+        return service.cropRecommendations(Long.parseLong(jwt.getSubject()), potId);
+    }
+
+    @GetMapping("/pots/{potId}/diagnostic-history")
+    public java.util.List<DiagnosticHistoryRecord> diagnosticHistory(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable long potId) {
+        return service.diagnosticHistory(Long.parseLong(jwt.getSubject()), potId);
+    }
+
     @Deprecated
     @GetMapping("/devices/{deviceId}/score")
     public EnvironmentScoreResponse latestForDevice(

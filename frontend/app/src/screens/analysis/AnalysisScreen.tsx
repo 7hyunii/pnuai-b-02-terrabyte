@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { font } from '../../appTheme/glass';
@@ -8,31 +8,55 @@ import { typeScale } from '../../appTheme/typography';
 import { SectionHeader } from '../../components/SectionHeader';
 import { SuitabilityFormulaModal } from '../../components/SuitabilityFormulaModal';
 import { Surface } from '../../components/Surface';
-import { altCrops, crops, factors } from '../../data';
+import { crops } from '../../data';
+import { getCropRecommendations, type CropRecommendation } from '../../analysis/analysisApi';
+import type { DeviceResponse } from '../../device/deviceApi';
 import type { Page } from '../../navigation/types';
 import { useDeviceEnvironment } from '../../shared/device-environment/DeviceEnvironmentProvider';
 import { getFactorRecommendation, getGradeLabel, getIssueFactors } from '../../shared/factorPresentation';
 import { useDisclosure } from '../../shared/hooks/useDisclosure';
 
-export function AnalysisScreen({ compact, onNavigate, onSelectCrop, selectedCrop }: {
+export function AnalysisScreen({ compact, device, onNavigate, onSelectCrop, selectedCrop }: {
   compact: boolean;
+  device?: DeviceResponse;
   onNavigate: (page: Page) => void;
   onSelectCrop: (cropCode: string) => Promise<void>;
   selectedCrop: number;
 }) {
   const currentCrop = crops[selectedCrop] ?? crops[0];
-  const { score: analysisScore, measurements: analysisLatest, refetch } = useDeviceEnvironment();
+  const { potId, score: analysisScore, measurements: analysisLatest, soilRecommendation, refetch } = useDeviceEnvironment();
   const formulaDisclosure = useDisclosure();
   const [cropSelectionError, setCropSelectionError] = useState<string | null>(null);
   const [selectingCropCode, setSelectingCropCode] = useState<string | null>(null);
+  const [cropReports, setCropReports] = useState<CropRecommendation[]>([]);
+  const [cropRecommendationError, setCropRecommendationError] = useState<string | null>(null);
 
-  const selectRecommendedCrop = async (index: number) => {
-    const crop = crops[index];
-    if (!crop || crop.code === currentCrop.code) return;
+  useEffect(() => {
+    let active = true;
+    if (!potId) {
+      setCropReports([]);
+      return () => { active = false; };
+    }
+    setCropRecommendationError(null);
+    void getCropRecommendations(potId)
+      .then((recommendations) => {
+        if (active) setCropReports(recommendations);
+      })
+      .catch((error) => {
+        if (active) {
+          setCropReports([]);
+          setCropRecommendationError(error instanceof Error ? error.message : '작물 추천을 불러오지 못했습니다.');
+        }
+      });
+    return () => { active = false; };
+  }, [potId, selectedCrop]);
+
+  const selectRecommendedCrop = async (cropCode: string) => {
+    if (cropCode === currentCrop.code) return;
     setCropSelectionError(null);
-    setSelectingCropCode(crop.code);
+    setSelectingCropCode(cropCode);
     try {
-      await onSelectCrop(crop.code);
+      await onSelectCrop(cropCode);
       await refetch();
     } catch (error) {
       setCropSelectionError(error instanceof Error ? error.message : '작물 선택을 변경하지 못했습니다.');
@@ -41,72 +65,27 @@ export function AnalysisScreen({ compact, onNavigate, onSelectCrop, selectedCrop
     }
   };
 
-  const scoreFactorReports = analysisScore?.factors.map((factor) => ({
-    label: factor.label,
-    unit: factor.unit,
-    avg24h: factor.current,
-    axisMax: Math.max(factor.current, factor.optimalMax * 1.25, 1),
-    status: factor.status,
-    finding: factor.status === 'OK'
-      ? `현재 ${factor.current.toLocaleString('ko-KR')}${factor.unit}로 적정 범위 안에 있으며 축 점수는 ${factor.score}점입니다.`
-      : `현재값이 적정 범위에서 ${factor.gap.toLocaleString('ko-KR')}${factor.unit} ${factor.status === 'LOW' ? '부족' : '초과'}하며 축 점수는 ${factor.score}점입니다.`,
-    recommendation: getFactorRecommendation(factor.key),
-  })) ?? [];
-  const soilMoistureReport = analysisLatest ? [{
-    label: '토양 수분',
-    unit: '%',
-    avg24h: analysisLatest.measurements.soilMoisturePct,
-    axisMax: 100,
-    status: 'REFERENCE',
-    finding: `현재 토양 수분은 ${analysisLatest.measurements.soilMoisturePct}%입니다. 이 값은 모니터링용이며 종합 적합도에는 포함되지 않습니다.`,
-    recommendation: '작물과 배지에 맞는 관수 기준이 확정되면 별도 관수 판단에 활용하세요.',
-  }] : [];
-  const soilTemperatureReport = analysisLatest?.measurements.soilTemperatureC == null ? [] : [{
-    label: '토양 온도',
-    unit: '℃',
-    avg24h: analysisLatest.measurements.soilTemperatureC,
-    axisMax: 35,
-    status: 'REFERENCE',
-    finding: `현재 토양 온도는 ${analysisLatest.measurements.soilTemperatureC.toLocaleString('ko-KR')}℃입니다. 뿌리 주변 온도 변화를 확인하는 참고 지표입니다.`,
-    recommendation: '급격한 온도 변화가 없도록 직사광선과 냉기를 피하고 배지 온도를 함께 관찰하세요.',
-  }];
-  const fallbackSoilTemperatureReport = {
-    label: '토양 온도',
-    unit: '℃',
-    avg24h: 22.8,
-    axisMax: 35,
-    status: 'REFERENCE' as const,
-    finding: '현재 토양 온도는 22.8℃입니다. 뿌리 주변 온도 변화를 확인하는 참고 지표입니다.',
-    recommendation: '급격한 온도 변화가 없도록 직사광선과 냉기를 피하고 배지 온도를 함께 관찰하세요.',
-  };
-  const fallbackFactorReports = factors.map((factor) => ({
-    label: factor.label,
-    unit: factor.unit,
-    avg24h: factor.avg24h,
-    axisMax: factor.axisMax,
-    status: factor.status,
-    finding: factor.status === 'OK'
-      ? `최근 평균 ${factor.avg24h.toLocaleString('ko-KR')}${factor.unit}로 권장 범위 안에 있습니다.`
-      : `최근 평균 ${factor.avg24h.toLocaleString('ko-KR')}${factor.unit}로 권장 범위보다 ${factor.status === 'LOW' ? '낮은' : '높은'} 상태입니다.`,
-    recommendation: factor.label === '온도'
-      ? '환기와 보온 상태를 확인해 20~26℃ 범위를 유지하세요.'
-      : factor.label === '습도'
-        ? '관수와 환기 시간을 조절해 60~75% 범위를 유지하세요.'
-        : factor.label === '조도'
-          ? '생장등의 세기와 설치 거리를 조절해 조도를 보완하세요.'
-          : '관수 전 토양 수분을 확인하고 30~45% 범위를 유지하세요.',
-  }));
-  const factorReports = analysisScore?.factors.length
-    ? [...scoreFactorReports, ...soilMoistureReport, ...soilTemperatureReport]
-    : [...fallbackFactorReports, ...(soilTemperatureReport.length ? soilTemperatureReport : [fallbackSoilTemperatureReport])];
+  const factorReports = analysisScore?.factors.map((factor) => {
+    const contributesToOverallScore = ['temperature', 'humidity', 'plantLight'].includes(factor.key);
+    const scoreLabel = contributesToOverallScore ? '종합 적합도 계산 점수' : '토양 상태 점수';
+    return {
+      label: factor.label,
+      unit: factor.unit,
+      avg24h: factor.current,
+      axisMax: Math.max(factor.current, factor.optimalMax * 1.25, 1),
+      status: factor.status,
+      finding: factor.status === 'OK'
+        ? `현재 ${factor.current.toLocaleString('ko-KR')}${factor.unit}로 적정 범위 안에 있으며 ${scoreLabel}는 ${factor.score}점입니다.`
+        : `현재값이 적정 범위에서 ${factor.gap.toLocaleString('ko-KR')}${factor.unit} ${factor.status === 'LOW' ? '부족' : '초과'}하며 ${scoreLabel}는 ${factor.score}점입니다.`,
+      recommendation: getFactorRecommendation(factor.key),
+    };
+  }) ?? [];
   const issueFactors = getIssueFactors(analysisScore?.factors ?? []);
-  const cropReports = altCrops.map((crop) => ({
-    index: crop.setsCropIndex,
-    name: crop.name,
-    score: crop.expectedScore,
-    reason: crop.reason,
-    caution: crop.caution,
-  }));
+  const soilMoisture = analysisLatest?.measurements.soilMoisturePct;
+  const soilTemperature = analysisLatest?.measurements.soilTemperatureC;
+  const soilMoistureFactor = analysisScore?.factors.find((factor) => factor.key === 'soilMoisture');
+  const soilTemperatureFactor = analysisScore?.factors.find((factor) => factor.key === 'soilTemperature');
+  const spaceName = device?.space?.name ?? '등록된 공간 없음';
 
   return (
     <View style={styles.pageBody}>
@@ -117,7 +96,7 @@ export function AnalysisScreen({ compact, onNavigate, onSelectCrop, selectedCrop
               <Text style={styles.reportEyebrow}>공간 진단 요약</Text>
               <View style={styles.reportCropBadge}><Text style={styles.reportCropBadgeText}>{currentCrop.name} 재배 기준</Text></View>
             </View>
-            <Text style={styles.reportTitle}>부산 도심 옥상 A 공간 진단 보고서</Text>
+            <Text style={styles.reportTitle}>{spaceName} 공간 진단 보고서</Text>
             <Text style={styles.reportIntro}>현재 측정값을 바탕으로 공간의 적합도와 바로 실행할 관리 항목을 정리했습니다.</Text>
           </View>
         </View>
@@ -196,7 +175,7 @@ export function AnalysisScreen({ compact, onNavigate, onSelectCrop, selectedCrop
                     <Text style={styles.reportFactorName}>{factor.label}</Text>
                     <Text style={styles.reportFactorValue}>{factor.avg24h.toLocaleString('ko-KR')}{factor.unit}</Text>
                   </View>
-                  <Text style={[styles.reportStatus, factor.status !== 'OK' && factor.status !== 'REFERENCE' && styles.reportStatusWarn]}>{factor.status === 'OK' ? '안정' : factor.status === 'REFERENCE' ? '참고 지표' : '보완 필요'}</Text>
+                  <Text style={[styles.reportStatus, factor.status !== 'OK' && styles.reportStatusWarn]}>{factor.status === 'OK' ? '안정' : '보완 필요'}</Text>
                 </View>
                 <View style={styles.factorTrack}><View style={[styles.factorFill, factor.status !== 'OK' && styles.factorFillWarn, { width: `${width}%` } as any]} /></View>
                 <View style={[styles.reportFindingGrid, compact && styles.stack]}>
@@ -262,21 +241,23 @@ export function AnalysisScreen({ compact, onNavigate, onSelectCrop, selectedCrop
           {cropReports.map((crop) => (
             <Pressable
               disabled={selectingCropCode !== null}
-              key={crop.name}
-              onPress={() => void selectRecommendedCrop(crop.index)}
-              style={[styles.reportCropRow, compact && styles.stack, selectedCrop === crop.index && styles.reportCropRowSelected]}
+              key={crop.cropCode}
+              onPress={() => void selectRecommendedCrop(crop.cropCode)}
+              style={[styles.reportCropRow, compact && styles.stack, currentCrop.code === crop.cropCode && styles.reportCropRowSelected]}
             >
-              <View style={styles.reportCropScore}><Text style={styles.reportCropScoreValue}>{crop.score}</Text><Text style={styles.reportCropScoreUnit}>점</Text></View>
+              <View style={styles.reportCropScore}><Text style={styles.reportCropScoreValue}>{Math.round(crop.total)}</Text><Text style={styles.reportCropScoreUnit}>점</Text></View>
               <View style={styles.reportCropCopy}>
-                <Text style={styles.reportCropName}>{crop.name}{selectedCrop === crop.index ? ' · 현재 분석 기준' : ''}</Text>
+                <Text style={styles.reportCropName}>{crop.cropName}{currentCrop.code === crop.cropCode ? ' · 현재 분석 기준' : ''}</Text>
                 <Text style={styles.reportCropReason}>{crop.reason}</Text>
                 <Text style={styles.reportCropCaution}>{crop.caution}</Text>
               </View>
               <Text style={styles.reportCropAction}>
-                {selectingCropCode === crops[crop.index]?.code ? '변경 중…' : '분석 기준으로 선택'}
+                {selectingCropCode === crop.cropCode ? '변경 중…' : '분석 기준으로 선택'}
               </Text>
             </Pressable>
           ))}
+          {!cropReports.length && !cropRecommendationError ? <Text style={styles.reportFindingText}>작물 추천 데이터를 불러오는 중이거나 아직 측정 데이터가 없습니다.</Text> : null}
+          {cropRecommendationError ? <Text accessibilityRole="alert" style={styles.authError}>{cropRecommendationError}</Text> : null}
           {cropSelectionError ? <Text accessibilityRole="alert" style={styles.authError}>{cropSelectionError}</Text> : null}
         </View>
       </Surface>
@@ -287,26 +268,23 @@ export function AnalysisScreen({ compact, onNavigate, onSelectCrop, selectedCrop
           <SectionHeader title="토양 및 배지 추천" description="토양분석 세트의 수분·온도 측정값과 선택한 작물의 뿌리 특성을 반영했습니다." />
         </View>
         <View style={[styles.soilSummaryGrid, compact && styles.stack]}>
-          <View style={styles.soilSummaryItem}><Text style={styles.soilSummaryLabel}>토양 수분</Text><Text style={styles.soilSummaryValue}>36%</Text><Text style={styles.soilSummaryState}>적정</Text></View>
-          <View style={styles.soilSummaryItem}><Text style={styles.soilSummaryLabel}>토양 온도</Text><Text style={styles.soilSummaryValue}>22.8℃</Text><Text style={styles.soilSummaryState}>적정</Text></View>
-          <View style={styles.soilSummaryItem}><Text style={styles.soilSummaryLabel}>배수 상태</Text><Text style={styles.soilSummaryValue}>72점</Text><Text style={styles.soilSummaryStateWarn}>보완 권장</Text></View>
+          <View style={styles.soilSummaryItem}><Text style={styles.soilSummaryLabel}>토양 수분</Text><Text style={styles.soilSummaryValue}>{soilMoisture == null ? '--' : `${soilMoisture}%`}</Text><Text style={soilMoistureFactor?.status === 'OK' ? styles.soilSummaryState : styles.soilSummaryStateWarn}>{soilMoistureFactor == null ? '수신 대기' : soilMoistureFactor.status === 'OK' ? '적정' : '확인 필요'}</Text></View>
+          <View style={styles.soilSummaryItem}><Text style={styles.soilSummaryLabel}>토양 온도</Text><Text style={styles.soilSummaryValue}>{soilTemperature == null ? '--' : `${soilTemperature.toLocaleString('ko-KR')}℃`}</Text><Text style={soilTemperatureFactor?.status === 'OK' ? styles.soilSummaryState : styles.soilSummaryStateWarn}>{soilTemperatureFactor == null ? '수신 대기' : soilTemperatureFactor.status === 'OK' ? '적정' : '확인 필요'}</Text></View>
+          <View style={styles.soilSummaryItem}><Text style={styles.soilSummaryLabel}>추천 배합</Text><Text style={styles.soilSummaryValue}>{soilRecommendation?.mixRatio ?? '--'}</Text><Text style={soilRecommendation ? styles.soilSummaryState : styles.soilSummaryStateWarn}>{soilRecommendation ? 'API 추천' : '수신 대기'}</Text></View>
         </View>
         <View style={styles.soilRecommendationList}>
-          {[
-            { label: '1순위', title: '실내 허브용 배양토 + 펄라이트', ratio: '권장 배합 2 : 1', body: '현재 수분을 유지하면서 통기성과 배수성을 높이는 구성입니다. 바질과 페퍼민트의 뿌리 과습을 예방하기 좋습니다.', note: '분갈이 시 화분 하단에 배수층 2cm 확보' },
-            { label: '2순위', title: '코코피트 + 펄라이트 + 상토', ratio: '권장 배합 1 : 1 : 2', body: '가볍고 수분 분포가 고른 배지입니다. 자동 관수 키트를 함께 사용할 때 수분 편차를 줄일 수 있습니다.', note: '초기 2주간 토양 수분 32~40% 유지' },
-            { label: '유지 관리', title: '기존 흙 배수성 보완', ratio: '펄라이트 20% 추가', body: '전체 분갈이가 어렵다면 표토를 걷어내고 펄라이트를 혼합해 배수성을 단계적으로 개선하세요.', note: '혼합 후 첫 관수량은 평소의 70% 적용' },
-          ].map((soilItem) => (
-            <View key={soilItem.title} style={styles.soilRecommendationRow}>
-              <View style={styles.soilRecommendationLabelWrap}><Text style={styles.soilRecommendationLabel}>{soilItem.label}</Text></View>
+          {soilRecommendation?.materials.map((soilItem, index) => (
+            <View key={soilItem.name} style={styles.soilRecommendationRow}>
+              <View style={styles.soilRecommendationLabelWrap}><Text style={styles.soilRecommendationLabel}>{index === 0 ? '추천 배합' : `재료 ${index + 1}`}</Text></View>
               <View style={styles.soilRecommendationCopy}>
-                <Text style={styles.soilRecommendationTitle}>{soilItem.title}</Text>
-                <Text style={styles.soilRecommendationRatio}>{soilItem.ratio}</Text>
-                <Text style={styles.soilRecommendationBody}>{soilItem.body}</Text>
-                <Text style={styles.soilRecommendationNote}>{soilItem.note}</Text>
+                <Text style={styles.soilRecommendationTitle}>{soilItem.name}</Text>
+                <Text style={styles.soilRecommendationRatio}>{soilRecommendation.mixRatioText} · {soilItem.parts}비율</Text>
+                <Text style={styles.soilRecommendationBody}>{soilItem.role}</Text>
+                <Text style={styles.soilRecommendationNote}>{index === 0 ? soilRecommendation.reason : soilRecommendation.cautions[index - 1] ?? soilRecommendation.reason}</Text>
               </View>
             </View>
           ))}
+          {!soilRecommendation ? <Text style={styles.reportFindingText}>토양 및 배지 추천 데이터를 불러오는 중이거나 아직 측정 데이터가 없습니다.</Text> : null}
         </View>
       </Surface>
 

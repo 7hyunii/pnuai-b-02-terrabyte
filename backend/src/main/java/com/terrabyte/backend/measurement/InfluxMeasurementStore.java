@@ -71,6 +71,23 @@ public class InfluxMeasurementStore implements MeasurementStore {
     }
 
     @Override
+    public List<TelemetrySample> findSamples(long potId, Instant start) {
+        String flux = """
+                from(bucket: "%s")
+                  |> range(start: time(v: "%s"))
+                  |> filter(fn: (r) => r._measurement == "%s" and r.pot_id == "%s")
+                  |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+                  |> sort(columns: ["_time"])
+                """.formatted(
+                escape(properties.bucket()),
+                start,
+                MEASUREMENT,
+                potId);
+
+        return records(flux).stream().map(this::toSample).toList();
+    }
+
+    @Override
     public List<MeasurementPoint> findPoints(
             long potId,
             MeasurementMetric metric,

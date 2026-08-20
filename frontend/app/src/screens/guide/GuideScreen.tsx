@@ -8,49 +8,14 @@ import { typeScale } from '../../appTheme/typography';
 import { ActionButton } from '../../components/ActionButton';
 import { SectionHeader } from '../../components/SectionHeader';
 import { Surface } from '../../components/Surface';
-import { shopProducts, type ShopProduct } from '../../data';
+import { cultivationCriteria, managementTasks, shopProducts, type ShopProduct } from '../../data';
 import type { Page } from '../../navigation/types';
 import { useDeviceEnvironment } from '../../shared/device-environment/DeviceEnvironmentProvider';
 import { getRecommendedProductIds } from '../../shared/factorPresentation';
 
-const managementTasks = [
-  {
-    id: 'grow-light',
-    priority: '높음',
-    title: '생장등 작동 상태 확인',
-    body: '현재 조도가 8,000lux까지 낮아졌습니다. 조명 전원과 잎 사이 30cm 거리를 확인하세요.',
-    time: '예상 5분',
-  },
-  {
-    id: 'humidity',
-    priority: '보통',
-    title: '오후 습도 유지',
-    body: '관수 직후 환기를 10분 늦추고 습도가 50% 이상 회복되는지 확인하세요.',
-    time: '예상 10분',
-  },
-] as const;
-
-const cultivationCriteria = [
-  {
-    label: '현재 단계',
-    title: '활착기 · 4일차',
-    body: '뿌리가 새 배지에 자리 잡는 기간입니다. 과습과 강한 빛 변화를 피하세요.',
-  },
-  {
-    label: '권장 환경',
-    title: '20~26℃ · 55~70%',
-    body: '보조 조명 4시간을 기준으로 관리합니다.',
-  },
-  {
-    label: '다음 점검',
-    title: '3일 후',
-    body: '새잎, 잎 말림, 줄기 웃자람 여부를 확인하고 환경을 다시 분석합니다.',
-  },
-] as const;
-
 export function GuideScreen({ compact, onNavigate }: { compact: boolean; onNavigate: (page: Page) => void }) {
   const [completedTaskIds, setCompletedTaskIds] = useState<Record<string, boolean>>({});
-  const { score } = useDeviceEnvironment();
+  const { score, soilRecommendation } = useDeviceEnvironment();
   const environmentProducts = getRecommendedProductIds(score?.factors ?? [])
     .map((id) => shopProducts.find((product) => product.id === id))
     .filter((product): product is ShopProduct => Boolean(product));
@@ -112,6 +77,38 @@ export function GuideScreen({ compact, onNavigate }: { compact: boolean; onNavig
           ))}
         </View>
       </Surface>
+
+      {soilRecommendation ? (
+        <Surface flat style={styles.guidePanel}>
+          <SectionHeader
+            title="토양 배합 추천"
+            description={`${soilRecommendation.cropName} 재배 기준 · ${soilRecommendation.targetCondition}`}
+          />
+          <View style={styles.soilMixRow}>
+            <Text style={styles.soilMixRatio}>{soilRecommendation.mixRatioText}</Text>
+            <Text style={styles.soilReason}>{soilRecommendation.reason}</Text>
+          </View>
+          <View style={[styles.soilMaterialGrid, compact && styles.stack]}>
+            {soilRecommendation.materials.map((material) => (
+              <View key={material.name} style={styles.soilMaterialCard}>
+                <Text style={styles.soilMaterialName}>{material.name} · {material.parts}비율</Text>
+                <Text style={styles.soilMaterialRole}>{material.role}</Text>
+              </View>
+            ))}
+          </View>
+          {soilRecommendation.preChecks.length ? (
+            <View style={styles.soilPreCheckList}>
+              {soilRecommendation.preChecks.map((item) => <Text key={item} style={styles.soilPreCheckItem}>· {item}</Text>)}
+            </View>
+          ) : null}
+          {soilRecommendation.cautions.length ? (
+            <View style={styles.soilCautionList}>
+              {soilRecommendation.cautions.map((item) => <Text key={item} style={styles.soilCautionItem}>· {item}</Text>)}
+            </View>
+          ) : null}
+          {soilRecommendation.assumptionNotice.map((item) => <Text key={item} style={styles.soilAssumptionNotice}>{item}</Text>)}
+        </Surface>
+      ) : null}
 
       <Surface flat style={styles.guideProductsPanel}>
         <SectionHeader title="현재 환경 추천 제품" description="현재 환경에서 보완이 필요한 지표를 기준으로 선정했습니다." />

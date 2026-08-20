@@ -7,7 +7,7 @@ import { font } from '../appTheme/glass';
 import { palette } from '../appTheme/palette';
 import { scaleTypography } from '../appTheme/scaleTypography';
 import { typeScale } from '../appTheme/typography';
-import type { PotResponse } from '../device/deviceApi';
+import type { DeviceResponse, PotResponse } from '../device/deviceApi';
 import { AnalysisScreen } from '../screens/analysis/AnalysisScreen';
 import { DashboardScreen } from '../screens/dashboard/DashboardScreen';
 import { HistoryScreen } from '../screens/history/HistoryScreen';
@@ -70,6 +70,7 @@ function ScreenLayout({ children, compact, onCreatePot, onSelectPot, onUpdatePot
 type AppTabNavigatorProps = {
   compact: boolean;
   cropName: string;
+  device?: DeviceResponse;
   onLogout: () => void;
   onCreatePot: (label: string, cropCode: string) => Promise<void>;
   onSelectCrop: (cropCode: string) => Promise<void>;
@@ -82,7 +83,7 @@ type AppTabNavigatorProps = {
 
 const appShellFill = { flex: 1 };
 
-export function AppTabNavigator({ compact, cropName, onCreatePot, onLogout, onSelectCrop, onSelectPot, onUpdatePot, pots, selectedCrop, selectedPotId }: AppTabNavigatorProps) {
+export function AppTabNavigator({ compact, cropName, device, onCreatePot, onLogout, onSelectCrop, onSelectPot, onUpdatePot, pots, selectedCrop, selectedPotId }: AppTabNavigatorProps) {
   const navigationRef = useNavigationContainerRef<AppTabParamList>();
   const [page, setPage] = useState<Page>('dashboard');
   const [sidebarHidden, setSidebarHidden] = useState(false);
@@ -105,6 +106,7 @@ export function AppTabNavigator({ compact, cropName, onCreatePot, onLogout, onSe
           <Sidebar
             compact={compact}
             cropName={cropName}
+            device={device}
             onHide={compact ? undefined : () => setSidebarHidden(true)}
             onLogout={onLogout}
             onNavigate={goToPage}
@@ -116,14 +118,14 @@ export function AppTabNavigator({ compact, cropName, onCreatePot, onLogout, onSe
             <Tab.Screen name="Dashboard">
               {() => (
                 <ScreenLayout compact={compact} onCreatePot={onCreatePot} onSelectPot={onSelectPot} onUpdatePot={onUpdatePot} page="dashboard" pots={pots} selectedPotId={selectedPotId}>
-                  <DashboardScreen compact={compact} onNavigate={goToPage} selectedCrop={selectedCrop} />
+                  <DashboardScreen compact={compact} device={device} onNavigate={goToPage} selectedCrop={selectedCrop} />
                 </ScreenLayout>
               )}
             </Tab.Screen>
             <Tab.Screen name="Analysis">
               {() => (
                 <ScreenLayout compact={compact} onCreatePot={onCreatePot} onSelectPot={onSelectPot} onUpdatePot={onUpdatePot} page="analysis" pots={pots} selectedPotId={selectedPotId}>
-                  <AnalysisScreen compact={compact} onNavigate={goToPage} onSelectCrop={onSelectCrop} selectedCrop={selectedCrop} />
+                  <AnalysisScreen compact={compact} device={device} onNavigate={goToPage} onSelectCrop={onSelectCrop} selectedCrop={selectedCrop} />
                 </ScreenLayout>
               )}
             </Tab.Screen>
@@ -137,7 +139,7 @@ export function AppTabNavigator({ compact, cropName, onCreatePot, onLogout, onSe
             <Tab.Screen name="History">
               {() => (
                 <ScreenLayout compact={compact} onCreatePot={onCreatePot} onSelectPot={onSelectPot} onUpdatePot={onUpdatePot} page="history" pots={pots} selectedPotId={selectedPotId}>
-                  <HistoryScreen compact={compact} onNavigate={goToPage} />
+                  <HistoryScreen compact={compact} onNavigate={goToPage} potId={selectedPotId} />
                 </ScreenLayout>
               )}
             </Tab.Screen>

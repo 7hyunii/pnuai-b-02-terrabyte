@@ -300,7 +300,9 @@ class MeasurementApiIntegrationTests {
                 .andExpect(jsonPath("$.grade").value("GOOD"))
                 .andExpect(jsonPath("$.factors[0].key").value("temperature"))
                 .andExpect(jsonPath("$.factors[2].key").value("plantLight"))
-                .andExpect(jsonPath("$.factors[2].score").value(88.7));
+                .andExpect(jsonPath("$.factors[2].score").value(88.7))
+                .andExpect(jsonPath("$.factors[3].key").value("soilMoisture"))
+                .andExpect(jsonPath("$.factors[4].key").value("soilTemperature"));
     }
 
     @Test

@@ -224,16 +224,41 @@ cd backend
 ## 인증 API
 
 ```text
-POST /api/auth/signup  회원가입 및 액세스 토큰 발급
-POST /api/auth/login   로그인 및 액세스 토큰 발급
-GET  /api/me           현재 사용자 조회
-POST /api/devices      6자리 기기 코드 등록
-GET  /api/crops        선택 가능한 작물 목록 및 검색
-PATCH /api/devices/{id}/crop  기기의 재배 작물 선택 또는 변경
-POST /api/telemetry    하드웨어 센서 데이터 수신
-GET  /api/devices/{id}/measurements/latest  최신 측정값 조회
-GET  /api/devices/{id}/measurements         기간별 측정값 조회
-GET  /api/devices/{id}/score                최신 환경 적합도 조회
+POST  /api/auth/signup                              회원가입 및 액세스 토큰 발급 (공개)
+POST  /api/auth/login                               로그인 및 액세스 토큰 발급 (공개)
+GET   /api/me                                       현재 사용자 조회
+
+GET   /api/spaces                                   내 재배 공간 목록 조회
+POST  /api/spaces                                   재배 공간 등록
+
+POST  /api/devices                                  기기 등록 또는 연결
+GET   /api/devices                                  내 기기 목록 조회
+GET   /api/devices/{deviceId}                       기기 상세 조회
+GET   /api/devices/{deviceId}/sensors               기기별 센서 목록·상태 조회
+POST  /api/devices/{deviceId}/pots                  기기에 화분 등록
+
+GET   /api/pots                                     내 화분 목록 조회
+GET   /api/pots/{potId}                             화분 상세 조회
+PATCH /api/pots/{potId}                             화분 정보 수정
+
+GET   /api/crops                                    작물 목록·검색 조회
+PATCH /api/pots/{potId}/crop                        화분 재배 작물 선택 또는 변경
+PATCH /api/devices/{deviceId}/crop                  기기 재배 작물 선택 또는 변경 (deprecated)
+
+GET   /api/pots/{potId}/measurements/latest         화분 최신 측정값 조회
+GET   /api/pots/{potId}/measurements                화분 측정값 시계열 조회
+GET   /api/pots/{potId}/score                       화분 최신 환경 적합도 조회
+GET   /api/pots/{potId}/soil-recommendation         화분 토양 배합 추천 조회
+GET   /api/pots/{potId}/crop-recommendations        화분 대체 작물 추천 조회
+GET   /api/pots/{potId}/diagnostic-history          화분 진단 이력 조회
+
+GET   /api/devices/{deviceId}/measurements/latest   기기 최신 측정값 조회 (deprecated)
+GET   /api/devices/{deviceId}/measurements          기기 측정값 시계열 조회 (deprecated)
+GET   /api/devices/{deviceId}/score                 기기 최신 환경 적합도 조회 (deprecated)
+GET   /api/devices/{deviceId}/soil-recommendation   기기 토양 배합 추천 조회 (deprecated)
+
+GET   /api/products                                 상품 목록 조회
+POST  /api/telemetry                                하드웨어 센서 데이터 수신 (공개, 설정 시 활성화)
 ```
 
 회원가입 요청 예시:
