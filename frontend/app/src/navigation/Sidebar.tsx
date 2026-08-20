@@ -48,6 +48,7 @@ export function Sidebar({ compact, cropName, onHide, onLogout, onNavigate, page 
   return (
     <>
     <View style={[styles.sidebar, glassWebStyle]}>
+      <ScrollView showsVerticalScrollIndicator style={styles.sidebarScroll}>
       <View style={styles.brandRow}>
         <Text style={styles.brandName}>TerraByte</Text>
         {onHide ? (
@@ -93,6 +94,7 @@ export function Sidebar({ compact, cropName, onHide, onLogout, onNavigate, page 
           <Text style={styles.sidebarActionTextMuted}>로그아웃</Text>
         </Pressable>
       </View>
+      </ScrollView>
     </View>
     <Modal animationType="fade" onRequestClose={() => setFarmInfoOpen(false)} transparent visible={farmInfoOpen}>
       <View style={styles.modalBackdrop}>
@@ -144,6 +146,7 @@ export function Sidebar({ compact, cropName, onHide, onLogout, onNavigate, page 
 const styles = StyleSheet.create(scaleTypography({
   pressed: { opacity: 0.78 },
   sidebar: { backgroundColor: 'rgba(255,255,255,0.44)', borderColor: palette.line, borderRightWidth: 1, paddingBottom: 30, paddingHorizontal: 22, paddingTop: 38, width: 240, zIndex: 2 },
+  sidebarScroll: { flex: 1, minHeight: 0, scrollbarColor: 'rgba(72, 104, 83, 0.35) transparent', scrollbarWidth: 'thin' } as any,
   brandRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 10 },
   brandName: { ...typeScale.cardTitle, color: palette.text, fontFamily: font },
   hideButton: { alignItems: 'center', borderColor: palette.line, borderRadius: 8, borderWidth: 1, height: 30, justifyContent: 'center', width: 30 },
