@@ -65,39 +65,26 @@ export function AnalysisScreen({ compact, device, onNavigate, onSelectCrop, sele
     }
   };
 
-  const scoreFactorReports = analysisScore?.factors.map((factor) => ({
-    label: factor.label,
-    unit: factor.unit,
-    avg24h: factor.current,
-    axisMax: Math.max(factor.current, factor.optimalMax * 1.25, 1),
-    status: factor.status,
-    finding: factor.status === 'OK'
-      ? `현재 ${factor.current.toLocaleString('ko-KR')}${factor.unit}로 적정 범위 안에 있으며 축 점수는 ${factor.score}점입니다.`
-      : `현재값이 적정 범위에서 ${factor.gap.toLocaleString('ko-KR')}${factor.unit} ${factor.status === 'LOW' ? '부족' : '초과'}하며 축 점수는 ${factor.score}점입니다.`,
-    recommendation: getFactorRecommendation(factor.key),
-  })) ?? [];
-  const soilMoistureReport = analysisLatest ? [{
-    label: '토양 수분',
-    unit: '%',
-    avg24h: analysisLatest.measurements.soilMoisturePct,
-    axisMax: 100,
-    status: 'REFERENCE',
-    finding: `현재 토양 수분은 ${analysisLatest.measurements.soilMoisturePct}%입니다. 이 값은 모니터링용이며 종합 적합도에는 포함되지 않습니다.`,
-    recommendation: '작물과 배지에 맞는 관수 기준이 확정되면 별도 관수 판단에 활용하세요.',
-  }] : [];
-  const soilTemperatureReport = analysisLatest?.measurements.soilTemperatureC == null ? [] : [{
-    label: '토양 온도',
-    unit: '℃',
-    avg24h: analysisLatest.measurements.soilTemperatureC,
-    axisMax: 35,
-    status: 'REFERENCE',
-    finding: `현재 토양 온도는 ${analysisLatest.measurements.soilTemperatureC.toLocaleString('ko-KR')}℃입니다. 뿌리 주변 온도 변화를 확인하는 참고 지표입니다.`,
-    recommendation: '급격한 온도 변화가 없도록 직사광선과 냉기를 피하고 배지 온도를 함께 관찰하세요.',
-  }];
-  const factorReports = [...scoreFactorReports, ...soilMoistureReport, ...soilTemperatureReport];
+  const factorReports = analysisScore?.factors.map((factor) => {
+    const contributesToOverallScore = ['temperature', 'humidity', 'plantLight'].includes(factor.key);
+    const scoreLabel = contributesToOverallScore ? '종합 적합도 계산 점수' : '토양 상태 점수';
+    return {
+      label: factor.label,
+      unit: factor.unit,
+      avg24h: factor.current,
+      axisMax: Math.max(factor.current, factor.optimalMax * 1.25, 1),
+      status: factor.status,
+      finding: factor.status === 'OK'
+        ? `현재 ${factor.current.toLocaleString('ko-KR')}${factor.unit}로 적정 범위 안에 있으며 ${scoreLabel}는 ${factor.score}점입니다.`
+        : `현재값이 적정 범위에서 ${factor.gap.toLocaleString('ko-KR')}${factor.unit} ${factor.status === 'LOW' ? '부족' : '초과'}하며 ${scoreLabel}는 ${factor.score}점입니다.`,
+      recommendation: getFactorRecommendation(factor.key),
+    };
+  }) ?? [];
   const issueFactors = getIssueFactors(analysisScore?.factors ?? []);
   const soilMoisture = analysisLatest?.measurements.soilMoisturePct;
   const soilTemperature = analysisLatest?.measurements.soilTemperatureC;
+  const soilMoistureFactor = analysisScore?.factors.find((factor) => factor.key === 'soilMoisture');
+  const soilTemperatureFactor = analysisScore?.factors.find((factor) => factor.key === 'soilTemperature');
   const spaceName = device?.space?.name ?? '등록된 공간 없음';
 
   return (
@@ -188,7 +175,7 @@ export function AnalysisScreen({ compact, device, onNavigate, onSelectCrop, sele
                     <Text style={styles.reportFactorName}>{factor.label}</Text>
                     <Text style={styles.reportFactorValue}>{factor.avg24h.toLocaleString('ko-KR')}{factor.unit}</Text>
                   </View>
-                  <Text style={[styles.reportStatus, factor.status !== 'OK' && factor.status !== 'REFERENCE' && styles.reportStatusWarn]}>{factor.status === 'OK' ? '안정' : factor.status === 'REFERENCE' ? '참고 지표' : '보완 필요'}</Text>
+                  <Text style={[styles.reportStatus, factor.status !== 'OK' && styles.reportStatusWarn]}>{factor.status === 'OK' ? '안정' : '보완 필요'}</Text>
                 </View>
                 <View style={styles.factorTrack}><View style={[styles.factorFill, factor.status !== 'OK' && styles.factorFillWarn, { width: `${width}%` } as any]} /></View>
                 <View style={[styles.reportFindingGrid, compact && styles.stack]}>
@@ -281,8 +268,8 @@ export function AnalysisScreen({ compact, device, onNavigate, onSelectCrop, sele
           <SectionHeader title="토양 및 배지 추천" description="토양분석 세트의 수분·온도 측정값과 선택한 작물의 뿌리 특성을 반영했습니다." />
         </View>
         <View style={[styles.soilSummaryGrid, compact && styles.stack]}>
-          <View style={styles.soilSummaryItem}><Text style={styles.soilSummaryLabel}>토양 수분</Text><Text style={styles.soilSummaryValue}>{soilMoisture == null ? '--' : `${soilMoisture}%`}</Text><Text style={soilMoisture != null && soilMoisture >= 30 && soilMoisture <= 45 ? styles.soilSummaryState : styles.soilSummaryStateWarn}>{soilMoisture == null ? '수신 대기' : soilMoisture >= 30 && soilMoisture <= 45 ? '적정' : '확인 필요'}</Text></View>
-          <View style={styles.soilSummaryItem}><Text style={styles.soilSummaryLabel}>토양 온도</Text><Text style={styles.soilSummaryValue}>{soilTemperature == null ? '--' : `${soilTemperature.toLocaleString('ko-KR')}℃`}</Text><Text style={soilTemperature == null ? styles.soilSummaryStateWarn : styles.soilSummaryState}>{soilTemperature == null ? '수신 대기' : '측정 중'}</Text></View>
+          <View style={styles.soilSummaryItem}><Text style={styles.soilSummaryLabel}>토양 수분</Text><Text style={styles.soilSummaryValue}>{soilMoisture == null ? '--' : `${soilMoisture}%`}</Text><Text style={soilMoistureFactor?.status === 'OK' ? styles.soilSummaryState : styles.soilSummaryStateWarn}>{soilMoistureFactor == null ? '수신 대기' : soilMoistureFactor.status === 'OK' ? '적정' : '확인 필요'}</Text></View>
+          <View style={styles.soilSummaryItem}><Text style={styles.soilSummaryLabel}>토양 온도</Text><Text style={styles.soilSummaryValue}>{soilTemperature == null ? '--' : `${soilTemperature.toLocaleString('ko-KR')}℃`}</Text><Text style={soilTemperatureFactor?.status === 'OK' ? styles.soilSummaryState : styles.soilSummaryStateWarn}>{soilTemperatureFactor == null ? '수신 대기' : soilTemperatureFactor.status === 'OK' ? '적정' : '확인 필요'}</Text></View>
           <View style={styles.soilSummaryItem}><Text style={styles.soilSummaryLabel}>추천 배합</Text><Text style={styles.soilSummaryValue}>{soilRecommendation?.mixRatio ?? '--'}</Text><Text style={soilRecommendation ? styles.soilSummaryState : styles.soilSummaryStateWarn}>{soilRecommendation ? 'API 추천' : '수신 대기'}</Text></View>
         </View>
         <View style={styles.soilRecommendationList}>
