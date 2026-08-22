@@ -1,4 +1,6 @@
 app:
+  admin:
+    api-key: terrabyte-test-admin-key
   security:
     jwt:
       secret: terrabyte-test-secret-must-be-at-least-32-bytes
@@ -11,3 +13,11 @@ app:
     sqlite:
       url: "jdbc:sqlite::memory:"
       driver-class-name: org.sqlite.JDBC
+  payment:
+    toss:
+      enabled: true
+      base-url: https://api.tosspayments.com
+      client-key: test_ck_test_terrabyte
+      secret-key: test_sk_test_terrabyte
+      success-url: http://localhost:8081/payment/success
+      fail-url: http://localhost:8081/payment/fail
