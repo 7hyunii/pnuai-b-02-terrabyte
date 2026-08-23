@@ -45,6 +45,10 @@ export INFLUX_TOKEN='InfluxDB API 토큰'
 export INFLUX_ORG='terrabyte'
 export INFLUX_BUCKET='telemetry'
 export TELEMETRY_DEVICE_KEY='하드웨어가 X-Device-Key로 보낼 공유 키'
+export GEMINI_ENABLED='true'
+export GEMINI_API_KEY='Google AI Studio에서 발급한 Gemini API 키'
+# 선택: 기본값은 gemini-3.5-flash-lite, 동일 측정값의 계획 캐시는 30분
+export GEMINI_MODEL='gemini-3.5-flash-lite'
 ```
 
 SQLite 점수 스키마와 마이그레이션은 애플리케이션이 시작될 때 자동으로 적용됩니다.
