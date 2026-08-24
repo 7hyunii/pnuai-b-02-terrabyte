@@ -8,7 +8,6 @@ record CarePlanDraft(
         List<Task> todayTasks,
         List<Criterion> cultivationCriteria,
         List<Improvement> improvementActions,
-        List<Schedule> weeklySchedule,
         Outcome expectedOutcome,
         List<Product> recommendedProducts) {
 
@@ -25,9 +24,6 @@ record CarePlanDraft(
     }
 
     record Improvement(String tag, String title, String body, String effect) {
-    }
-
-    record Schedule(String day, String title, String body) {
     }
 
     record Outcome(String title, String body, Double expectedScore) {

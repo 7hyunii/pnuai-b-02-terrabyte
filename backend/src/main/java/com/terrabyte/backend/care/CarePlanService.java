@@ -127,11 +127,10 @@ public class CarePlanService {
         List<CarePlanResponse.TodayTask> tasks = tasks(draft.todayTasks());
         List<CarePlanResponse.CultivationCriterion> criteria = criteria(draft.cultivationCriteria());
         List<CarePlanResponse.ImprovementAction> improvements = improvements(draft.improvementActions());
-        List<CarePlanResponse.ScheduleItem> schedule = schedule(draft.weeklySchedule());
         CarePlanResponse.ExpectedOutcome outcome = outcome(draft.expectedOutcome(), input.environmentScore().total());
         List<CarePlanResponse.RecommendedProduct> products = products(draft.recommendedProducts(), input.catalogProducts());
         return new CarePlanResponse(
-                generatedAt, "GEMINI", priorities, diagnostics, tasks, criteria, improvements, schedule, outcome, products);
+                generatedAt, "GEMINI", priorities, diagnostics, tasks, criteria, improvements, outcome, products);
     }
 
     private List<CarePlanResponse.ManagementPriority> priorities(
@@ -198,17 +197,6 @@ public class CarePlanService {
             result.add(new CarePlanResponse.ImprovementAction(
                     String.format("%02d", index + 1), text(improvement.tag(), 40), text(improvement.title(), 100),
                     text(improvement.body(), 360), text(improvement.effect(), 100)));
-        }
-        return result;
-    }
-
-    private List<CarePlanResponse.ScheduleItem> schedule(List<CarePlanDraft.Schedule> drafts) {
-        if (drafts == null || drafts.size() != 4) throw invalid();
-        List<CarePlanResponse.ScheduleItem> result = new ArrayList<>();
-        for (CarePlanDraft.Schedule item : drafts) {
-            if (item == null) throw invalid();
-            result.add(new CarePlanResponse.ScheduleItem(
-                    text(item.day(), 30), text(item.title(), 100), text(item.body(), 300)));
         }
         return result;
     }

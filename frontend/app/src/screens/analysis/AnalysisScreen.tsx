@@ -119,12 +119,6 @@ export function AnalysisScreen({ compact, device, onNavigate, onSelectCrop, sele
     { number: '02', tag: '3일 관찰', title: '오후 습도 하락 구간 완화', body: '관수 직후 환기 시작 시간을 10분 늦추고 물받이 트레이를 배치해 50~60% 범위를 유지하세요.', effect: '습도 안정화 · 예상 +4점' },
     { number: '03', tag: '현재 유지', title: '토양 수분 기준 관수 유지', body: '고정 시간 관수 대신 센서값 31% 이하를 기준으로 물을 주세요. 과습 위험을 줄일 수 있습니다.', effect: '뿌리 스트레스 예방' },
   ];
-  const weeklySchedule = carePlan?.weeklySchedule ?? [
-    { day: '오늘', title: '조명 설정', body: '생장등 위치와 4시간 운전 예약을 설정합니다.' },
-    { day: '1일 후', title: '센서 확인', body: '오후 평균 조도와 최저 습도가 개선됐는지 비교합니다.' },
-    { day: '3일 후', title: '잎 상태 관찰', body: '잎 말림, 변색, 줄기 웃자람 여부를 기록합니다.' },
-    { day: '7일 후', title: '재분석', body: '환경 적합도를 다시 계산하고 관수 및 조명 시간을 조정합니다.' },
-  ];
   const expectedOutcome = carePlan?.expectedOutcome ?? {
     title: '권장 조치 적용 시 예상 변화',
     body: '생장등과 습도 관리안을 함께 적용한 뒤 7일간 현재 관수 기준을 유지하는 조건입니다.',
@@ -247,21 +241,6 @@ export function AnalysisScreen({ compact, device, onNavigate, onSelectCrop, sele
       <Surface flat style={styles.reportSection}>
         <View style={styles.reportSectionHeading}>
           <Text style={styles.reportSectionNumber}>03</Text>
-          <SectionHeader title="7일 관리 일정" description="권장 조치를 적용한 뒤 확인해야 할 항목입니다." />
-        </View>
-        <View style={styles.reportSchedule}>
-          {weeklySchedule.map((item) => (
-            <View key={item.day} style={styles.reportScheduleRow}>
-              <Text style={styles.reportScheduleDay}>{item.day}</Text>
-              <View style={styles.reportScheduleCopy}><Text style={styles.reportScheduleTitle}>{item.title}</Text><Text style={styles.reportScheduleBody}>{item.body}</Text></View>
-            </View>
-          ))}
-        </View>
-      </Surface>
-
-      <Surface flat style={styles.reportSection}>
-        <View style={styles.reportSectionHeading}>
-          <Text style={styles.reportSectionNumber}>04</Text>
           <SectionHeader title="재배 작물 비교" description="현재 환경을 기준으로 작물별 적합도와 관리 유의사항을 비교했습니다." />
         </View>
         <View style={styles.reportCropList}>
@@ -291,7 +270,7 @@ export function AnalysisScreen({ compact, device, onNavigate, onSelectCrop, sele
 
       <Surface flat style={styles.reportSection}>
         <View style={styles.reportSectionHeading}>
-          <Text style={styles.reportSectionNumber}>05</Text>
+          <Text style={styles.reportSectionNumber}>04</Text>
           <SectionHeader title="토양 및 배지 추천" description="토양분석 세트의 수분·온도 측정값과 선택한 작물의 뿌리 특성을 반영했습니다." />
         </View>
         <View style={[styles.soilSummaryGrid, compact && styles.stack]}>
@@ -397,12 +376,6 @@ const styles = StyleSheet.create(scaleTypography({
   reportPlanTitle: { ...typeScale.cardTitle, color: palette.text, fontFamily: font, fontWeight: '600' },
   reportPlanBody: { ...typeScale.body, color: palette.secondary, fontFamily: font },
   reportPlanEffect: { ...typeScale.label, color: palette.greenDark, fontFamily: font, maxWidth: 210, textAlign: 'right' },
-  reportSchedule: { borderLeftColor: '#b8d7c3', borderLeftWidth: 2, gap: 4, marginLeft: 10 },
-  reportScheduleRow: { flexDirection: 'row', gap: 24, minHeight: 84, paddingBottom: 16, paddingLeft: 24, paddingTop: 4 },
-  reportScheduleDay: { ...typeScale.label, color: palette.greenDark, fontFamily: font, width: 86 },
-  reportScheduleCopy: { flex: 1, gap: 5 },
-  reportScheduleTitle: { ...typeScale.cardTitle, color: palette.text, fontFamily: font, fontWeight: '600' },
-  reportScheduleBody: { ...typeScale.body, color: palette.secondary, fontFamily: font, maxWidth: 850 },
   reportCropList: { gap: 0 },
   reportCropRow: { alignItems: 'center', borderBottomColor: palette.lineStrong, borderBottomWidth: 1, flexDirection: 'row', gap: 22, padding: 24 },
   reportCropRowSelected: { backgroundColor: palette.greenSoft },

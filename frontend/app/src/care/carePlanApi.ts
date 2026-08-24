@@ -31,11 +31,6 @@ export type CarePlan = {
     body: string;
     effect: string;
   }>;
-  weeklySchedule: Array<{
-    day: string;
-    title: string;
-    body: string;
-  }>;
   expectedOutcome: {
     title: string;
     body: string;

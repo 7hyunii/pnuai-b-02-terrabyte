@@ -11,7 +11,6 @@ public record CarePlanResponse(
         List<TodayTask> todayTasks,
         List<CultivationCriterion> cultivationCriteria,
         List<ImprovementAction> improvementActions,
-        List<ScheduleItem> weeklySchedule,
         ExpectedOutcome expectedOutcome,
         List<RecommendedProduct> recommendedProducts) {
 
@@ -28,9 +27,6 @@ public record CarePlanResponse(
     }
 
     public record ImprovementAction(String number, String tag, String title, String body, String effect) {
-    }
-
-    public record ScheduleItem(String day, String title, String body) {
     }
 
     public record ExpectedOutcome(String title, String body, double expectedScore, double scoreChange) {

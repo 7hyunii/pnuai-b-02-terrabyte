@@ -26,11 +26,10 @@ public class GeminiCarePlanGateway {
                 "todayTasks":{"type":"array","items":{"type":"object","properties":{"priority":{"type":"string","enum":["높음","보통","낮음"]},"title":{"type":"string"},"body":{"type":"string"},"time":{"type":"string"}},"required":["priority","title","body","time"]}},
                 "cultivationCriteria":{"type":"array","items":{"type":"object","properties":{"label":{"type":"string"},"title":{"type":"string"},"body":{"type":"string"}},"required":["label","title","body"]}},
                 "improvementActions":{"type":"array","items":{"type":"object","properties":{"tag":{"type":"string"},"title":{"type":"string"},"body":{"type":"string"},"effect":{"type":"string"}},"required":["tag","title","body","effect"]}},
-                "weeklySchedule":{"type":"array","items":{"type":"object","properties":{"day":{"type":"string"},"title":{"type":"string"},"body":{"type":"string"}},"required":["day","title","body"]}},
                 "expectedOutcome":{"type":"object","properties":{"title":{"type":"string"},"body":{"type":"string"},"expectedScore":{"type":"number"}},"required":["title","body","expectedScore"]},
                 "recommendedProducts":{"type":"array","items":{"type":"object","properties":{"productId":{"type":"string"},"reason":{"type":"string"}},"required":["productId","reason"]}}
               },
-              "required":["managementPriorities","factorDiagnostics","todayTasks","cultivationCriteria","improvementActions","weeklySchedule","expectedOutcome","recommendedProducts"]
+              "required":["managementPriorities","factorDiagnostics","todayTasks","cultivationCriteria","improvementActions","expectedOutcome","recommendedProducts"]
             }
             """;
 
@@ -87,7 +86,7 @@ public class GeminiCarePlanGateway {
                 제공된 측정값, 적정 범위, 점수, 토양 추천, 이력에서 확인할 수 있는 사실만 근거로 삼으세요. 측정되지 않은 병해충, 자동 장치 제어 완료, 확정된 점수 향상을 사실처럼 말하지 마세요.
                 사용자가 바로 실행할 수 있는 안전한 관리 행동을 우선합니다. 살충제·비료의 정확한 투입량처럼 작물별 추가 근거가 필요한 지시는 피하세요.
                 factorDiagnostics는 environmentScore.factors에 있는 모든 factorKey를 정확히 한 번씩 포함해 각 지표의 해석과 권장 조치를 작성하세요. managementPriorities는 해당 factorKey만 사용해 1~3개를 우선순위대로 작성하세요.
-                todayTasks는 2~3개, cultivationCriteria는 3개, improvementActions는 2~3개, weeklySchedule은 오늘·1일 후·3일 후·7일 후의 정확히 4개 항목으로 작성하세요.
+                todayTasks는 2~3개, cultivationCriteria는 3개, improvementActions는 2~3개로 작성하세요.
                 expectedOutcome.expectedScore는 현재 점수와 권장 조치가 모두 이행된 경우의 보수적인 추정치(0~100)입니다. 상품은 catalogProducts에 있는 productId만 최대 3개 추천하고, 필요하지 않으면 빈 배열을 반환하세요.
 
                 입력 데이터:
