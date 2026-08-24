@@ -78,7 +78,8 @@ class SqliteSchemaInitializer {
      */
     private static final List<String> MIGRATION_RESOURCES = List.of(
             "db/sqlite/migrations/2026-07-25_score_profiles_v2.sql",
-            "db/sqlite/migrations/2026-07-25_score_model_config_v1.sql"
+            "db/sqlite/migrations/2026-07-25_score_model_config_v1.sql",
+            "db/sqlite/migrations/2026-08-25_rename_arugula_to_rucola.sql"
     );
 
     private final DataSource scoreDataSource;
