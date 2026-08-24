@@ -124,6 +124,11 @@ services:
       TOSS_PAYMENTS_SECRET_KEY: ${TOSS_PAYMENTS_SECRET_KEY:-}
       TOSS_PAYMENTS_SUCCESS_URL: ${TOSS_PAYMENTS_SUCCESS_URL:-http://localhost:8081/payment/success}
       TOSS_PAYMENTS_FAIL_URL: ${TOSS_PAYMENTS_FAIL_URL:-http://localhost:8081/payment/fail}
+      GEMINI_ENABLED: ${GEMINI_ENABLED:-false}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash-lite}
+      GEMINI_BASE_URL: ${GEMINI_BASE_URL:-https://generativelanguage.googleapis.com}
+      GEMINI_CACHE_TTL: ${GEMINI_CACHE_TTL:-PT30M}
       # 원격 디버거(IDE)가 5005 로 붙을 수 있게 bootRun JVM 에 JDWP 를 붙인다.
       BOOT_RUN_JVM_ARGS: -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
     ports:

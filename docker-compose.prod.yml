@@ -76,6 +76,11 @@ services:
       TOSS_PAYMENTS_SECRET_KEY: ${TOSS_PAYMENTS_SECRET_KEY:-}
       TOSS_PAYMENTS_SUCCESS_URL: ${TOSS_PAYMENTS_SUCCESS_URL:-http://localhost:8088/payment/success}
       TOSS_PAYMENTS_FAIL_URL: ${TOSS_PAYMENTS_FAIL_URL:-http://localhost:8088/payment/fail}
+      GEMINI_ENABLED: ${GEMINI_ENABLED:-false}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash-lite}
+      GEMINI_BASE_URL: ${GEMINI_BASE_URL:-https://generativelanguage.googleapis.com}
+      GEMINI_CACHE_TTL: ${GEMINI_CACHE_TTL:-PT30M}
     volumes:
       - backend-data:/app/data
     restart: unless-stopped
