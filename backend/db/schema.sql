@@ -18,7 +18,7 @@ PRAGMA foreign_keys = ON;
 -- 1. 축 카탈로그
 -- ============================================================================
 
-CREATE TABLE axis_catalog (
+CREATE TABLE IF NOT EXISTS axis_catalog (
   axis  TEXT PRIMARY KEY CHECK (axis IN (
           'air_temperature','relative_humidity','plant_light',
           'particulate_matter','noise')),
@@ -29,18 +29,18 @@ CREATE TABLE axis_catalog (
   )
 ) STRICT, WITHOUT ROWID;
 
-INSERT INTO axis_catalog VALUES
+INSERT OR IGNORE INTO axis_catalog VALUES
   ('air_temperature','crop'), ('relative_humidity','crop'), ('plant_light','crop'),
   ('particulate_matter','common'), ('noise','common');
 
 -- 평가 상태. 결측/차단은 점수가 아니라 상태다.
-CREATE TABLE evaluation_state_catalog (
+CREATE TABLE IF NOT EXISTS evaluation_state_catalog (
   state       TEXT PRIMARY KEY,
   meaning_ko  TEXT NOT NULL,
   is_terminal INTEGER NOT NULL CHECK (is_terminal IN (0,1))
 ) STRICT, WITHOUT ROWID;
 
-INSERT INTO evaluation_state_catalog VALUES
+INSERT OR IGNORE INTO evaluation_state_catalog VALUES
   ('reference_available',        '앵커와 비교 가능. 등급이 아니라 거리다.', 0),
   ('no_verified_evidence',       '검증된 근거가 없다. 0점이 아니다.', 1),
   ('not_applicable_context',     '품종·생육단계·재배방식이 근거의 맥락과 다르다.', 1),
@@ -56,7 +56,7 @@ INSERT INTO evaluation_state_catalog VALUES
 -- 2. 근거 레이어 — 불변
 -- ============================================================================
 
-CREATE TABLE evidence_document (
+CREATE TABLE IF NOT EXISTS evidence_document (
   document_name  TEXT PRIMARY KEY CHECK (document_name IN (
                    'verified_numeric_evidence','insufficient_evidence','collection_contract')),
   schema_version TEXT NOT NULL,
@@ -65,12 +65,12 @@ CREATE TABLE evidence_document (
   loaded_at_utc  TEXT NOT NULL
 ) STRICT, WITHOUT ROWID;
 
-CREATE TRIGGER evidence_document_immutable_update
+CREATE TRIGGER IF NOT EXISTS evidence_document_immutable_update
 BEFORE UPDATE ON evidence_document BEGIN
   SELECT RAISE(ABORT,'evidence documents are immutable: edit the JSON and reload');
 END;
 
-CREATE TRIGGER evidence_document_immutable_delete
+CREATE TRIGGER IF NOT EXISTS evidence_document_immutable_delete
 BEFORE DELETE ON evidence_document BEGIN
   SELECT RAISE(ABORT,'evidence documents are immutable: edit the JSON and reload');
 END;
