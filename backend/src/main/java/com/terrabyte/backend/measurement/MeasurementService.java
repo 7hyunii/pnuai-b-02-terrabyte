@@ -9,6 +9,8 @@ import com.terrabyte.backend.api.ApiException;
 import com.terrabyte.backend.device.Device;
 import com.terrabyte.backend.device.DeviceRepository;
 import com.terrabyte.backend.device.DeviceStatus;
+import com.terrabyte.backend.notification.DevicePresenceObservedEvent;
+import com.terrabyte.backend.notification.SensorQualityObservedEvent;
 import com.terrabyte.backend.pot.Pot;
 import com.terrabyte.backend.pot.PotRepository;
 import com.terrabyte.backend.space.CultivationSpace;
@@ -16,6 +18,7 @@ import com.terrabyte.backend.space.CultivationSpaceRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +31,7 @@ public class MeasurementService {
     private final PotRepository potRepository;
     private final MeasurementStore measurementStore;
     private final TelemetryEventRepository telemetryEventRepository;
+    private final ApplicationEventPublisher eventPublisher;
     private final CultivationSpaceRepository spaceRepository;
     private final PpfdConverter ppfdConverter;
     private final Clock clock;
@@ -37,6 +41,7 @@ public class MeasurementService {
             PotRepository potRepository,
             MeasurementStore measurementStore,
             TelemetryEventRepository telemetryEventRepository,
+            ApplicationEventPublisher eventPublisher,
             CultivationSpaceRepository spaceRepository,
             PpfdConverter ppfdConverter,
             Clock clock) {
@@ -44,6 +49,7 @@ public class MeasurementService {
         this.potRepository = potRepository;
         this.measurementStore = measurementStore;
         this.telemetryEventRepository = telemetryEventRepository;
+        this.eventPublisher = eventPublisher;
         this.spaceRepository = spaceRepository;
         this.ppfdConverter = ppfdConverter;
         this.clock = clock;
@@ -89,8 +95,20 @@ public class MeasurementService {
             Pot pot = potRepository.findByDeviceAndNode(device.id(), node.nodeId())
                     .orElseGet(() -> bindNode(device, node.nodeId(), envelope.observedAt()));
             potRepository.markOnline(pot.id(), envelope.observedAt());
-            measurementStore.write(TelemetrySample.from(
-                    envelope, node, pot.id(), device.id(), pot.cropCode()));
+            TelemetrySample sample = TelemetrySample.from(
+                    envelope, node, pot.id(), device.id(), pot.cropCode());
+            measurementStore.write(sample);
+            if (device.userId() != null) {
+                eventPublisher.publishEvent(new SensorQualityObservedEvent(
+                        device.userId(),
+                        device.id(),
+                        pot.id(),
+                        pot.label(),
+                        node.quality().airSensorValid(),
+                        node.quality().lightSensorValid(),
+                        node.quality().soilSensorValid(),
+                        envelope.observedAt()));
+            }
             sequence = node.sequence();
         }
         deviceRepository.markOnline(device.id(), envelope.observedAt());
@@ -113,6 +131,14 @@ public class MeasurementService {
                         deviceRepository.markOnline(device.id(), clock.instant());
                     } else {
                         deviceRepository.markOffline(device.id(), clock.instant());
+                    }
+                    if (device.userId() != null) {
+                        eventPublisher.publishEvent(new DevicePresenceObservedEvent(
+                                device.userId(),
+                                device.id(),
+                                device.serialCode(),
+                                online,
+                                device.lastSeenAt()));
                     }
                     LOGGER.info("gateway presence gateway_id={} online={}", gatewayId, online);
                 },
