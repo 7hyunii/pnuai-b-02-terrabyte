@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -85,7 +86,9 @@ class IrrigationRepositoryTests {
 
     @Test
     void countsACompletedCommandByItsReportedVolume() {
-        Instant issuedAt = Instant.now().minus(Duration.ofHours(2));
+        Instant issuedAt = Instant.now()
+                .truncatedTo(ChronoUnit.MILLIS)
+                .minus(Duration.ofHours(2));
         String commandId = insert(CommandState.ISSUED, 100, null, issuedAt, issuedAt.plusSeconds(120));
 
         int updated = commandRepository.markCompleted(

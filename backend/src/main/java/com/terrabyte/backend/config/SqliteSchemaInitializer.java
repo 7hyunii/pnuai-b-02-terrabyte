@@ -11,6 +11,7 @@ import javax.sql.DataSource;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.sqlite.SQLiteConnection;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Configuration;
@@ -179,22 +180,26 @@ class SqliteSchemaInitializer {
     /**
      * classpath의 SQL 파일을 읽어 한 번에 실행합니다.
      * <p>
-     * SQLite JDBC는 {@link Statement#execute(String)}로 여러 문장을 한 번에
-     * 실행할 수 있으므로 세미콜론 분리 없이 전체 SQL을 넘깁니다.
-     * 이 방식은 {@code CREATE TRIGGER} 본문 안의 세미콜론이나
-     * {@code BEGIN/COMMIT} 트랜잭션 제어문도 올바르게 처리합니다.
+     * SQLite의 native script executor에 전체 SQL을 넘깁니다. JDBC
+     * {@link Statement#execute(String)}는 첫 문장만 실행하므로 전체 스키마
+     * 초기화에 사용할 수 없습니다. native executor는 {@code CREATE TRIGGER}
+     * 본문의 세미콜론도 SQLite 문법 그대로 처리합니다.
      */
     private void executeSqlFromClasspath(String classpathLocation) {
         Resource resource = new ClassPathResource(classpathLocation);
         if (!resource.exists()) {
             throw new IllegalStateException("SQL resource not found on classpath: " + classpathLocation);
         }
-        try (Connection conn = scoreDataSource.getConnection();
-             Statement stmt = conn.createStatement()) {
+        try (Connection conn = scoreDataSource.getConnection()) {
             String sql = new String(
                     resource.getInputStream().readAllBytes(),
                     java.nio.charset.StandardCharsets.UTF_8);
-            stmt.execute(sql);
+            SQLiteConnection sqliteConnection = conn.unwrap(SQLiteConnection.class);
+            int resultCode = sqliteConnection.getDatabase()._exec(sql);
+            if (resultCode != 0) {
+                throw new IllegalStateException(
+                        "SQLite script failed with result code " + resultCode);
+            }
         } catch (Exception e) {
             throw new RuntimeException(
                     "Failed to execute SQL from classpath: " + classpathLocation, e);
