@@ -1,4 +1,6 @@
-# TerraByte
+# <img src="docs/favicon.png" width="30" alt="TerraByte 로고" style="vertical-align: -7px;" /> TerraByte 
+
+![TerraByte 쇼케이스 썸네일](<docs/쇼케이스 썸네일 최종본.png>)
 
 ## 1. 프로젝트 소개
 
@@ -16,13 +18,14 @@
 
 TerraByte의 목표는 도심 유휴 공간의 스마트팜 전환 가능성을 데이터로 진단하고, 구축 이후의 환경 모니터링까지 연결하는 것입니다.
 
-- 단일 하드웨어 키트에서 대기 온습도, PPFD, 토양 온도, 토양 수분을 측정
-- 센서 장치가 측정한 온도, 습도, 광량(PPFD), 토양 수분 등의 환경 데이터 수집
+- 단일 하드웨어 키트에서 대기 온습도와 조도를 측정하고, 센서 구성·보정 완료 시 PPFD·토양 온도·토양 수분을 추가 측정
+- 센서 장치가 측정한 온도, 습도, 조도 및 구성된 센서의 PPFD·토양 데이터를 수집
 - 수집한 측정값과 작물별 권장 생육 범위를 비교한 환경 적합도 계산
 - 사용자, 재배 공간, 장치, 화분 정보를 연계한 통합 관리
 - 최신 센서값과 측정 이력을 확인할 수 있는 웹 대시보드 제공
 - 토양 프로필을 기반으로 한 추천 정보 제공
 - 복잡한 환경 데이터를 점수, 그래프, 색상과 관리 지침으로 변환하여 비전문가의 재배 위험 감소
+- AI 기반 관수량 추천과 맞춤 관리 가이드 제공
 <br/>
 
 ### 1.3. 세부내용
@@ -38,7 +41,7 @@ TerraByte의 목표는 도심 유휴 공간의 스마트팜 전환 가능성을 
 
 - 회원가입·로그인 및 JWT 기반 사용자 인증
 - 재배 공간, 장치, 화분 등록 및 조회
-- 대기 온습도, PPFD, 토양 온도, 토양 수분 텔레메트리 수집과 시계열 데이터 저장
+- 대기 온습도, 조도 및 구성된 센서의 PPFD·토양 온도·토양 수분 텔레메트리 수집과 시계열 데이터 저장
 - 장치·화분별 최신 측정값 및 측정 이력 조회
 - 작물별 환경 기준에 따른 항목별 점수와 종합 적합도 계산
 - 토양 추천 정보 및 적합도 계산 기준 제공
@@ -46,6 +49,8 @@ TerraByte의 목표는 도심 유휴 공간의 스마트팜 전환 가능성을 
 - Swagger UI를 통한 API 명세 확인
 - 상품 카탈로그 조회와 장바구니 관리, 주문 생성 및 취소 기능 제공
 - 토스페이먼츠 테스트 결제를 통한 주문 결제와 결제 취소 처리 제공
+- 안전 게이트를 거치는 관수 요청·이력 조회와 AI 기반 관수량 추천 제공
+- 환경 분석 결과를 바탕으로 한 맞춤 관리 가이드 제공
 <br/>
 
 ### 1.4. 기존 서비스(상품) 대비 차별성
@@ -70,19 +75,23 @@ TerraByte의 목표는 도심 유휴 공간의 스마트팜 전환 가능성을 
 
 ```mermaid
 flowchart LR
-    Sensor[센서 장치] -->|MQTT Telemetry| Broker[Mosquitto MQTT Broker]
+    Sensor[Arduino 센서 장치] -->|Serial JSON Lines| Edge[Orange Pi 게이트웨이]
+    Edge -->|MQTT Telemetry| Broker[Mosquitto MQTT Broker]
     Broker -->|Subscribe| Backend[Spring Boot Backend]
     Frontend[Expo / React Native Web] -->|REST API + JWT| Backend
     Backend --> PostgreSQL[(PostgreSQL)]
     Backend --> SQLite[(SQLite)]
     Backend --> InfluxDB[(InfluxDB)]
+    Backend <-->|관수량 추천 API| AiServer[FastAPI AI Server]
 ```
 
 | 구성 요소 | 역할 |
 | --- | --- |
-| 센서 장치 | 온도, 습도, 광량, 토양 수분 등의 환경 데이터 측정 및 전송 |
-| Expo Web | 사용자 인증, 장치·화분 관리, 측정값과 적합도 시각화 |
-| Spring Boot | REST API, 인증, 데이터 처리, 환경 점수 계산 |
+| Arduino 센서 장치 | 대기 온습도와 조도 측정, 구성·보정 완료 시 PPFD·토양 온도·토양 수분 추가 측정 |
+| Orange Pi 게이트웨이 | Arduino 시리얼 데이터 검증, 로컬 재전송 큐 관리, MQTT 텔레메트리 전송 |
+| Expo Web | 사용자 인증, 장치·화분 관리, 측정값·적합도·관리 가이드 시각화 |
+| Spring Boot | REST API, 인증, 데이터 처리, 환경 점수 계산, 관수 안전 게이트 |
+| FastAPI AI Server | 관수 필요 여부와 분리된 관수량 추천; 오류 시 백엔드가 안전한 폴백 적용 |
 | Mosquitto | Orange Pi 게이트웨이와 백엔드 간 MQTT 텔레메트리 전송 및 ACL 기반 접근 제어 |
 | PostgreSQL | 사용자, 공간, 장치 등 업무 데이터 저장 |
 | SQLite | 작물별 점수 프로필과 계산 기준 데이터 저장 |
@@ -95,7 +104,8 @@ flowchart LR
 |:---:|:---|:---|
 | **Frontend** | TypeScript v6.0 · React v19.2<br/>React Native v0.86 · Expo SDK 57 | 웹·모바일 공용 대시보드 화면 구현<br/>Storybook 기반 UI 컴포넌트 관리 |
 | **Backend** | Java 17 · Docker JDK 21<br/>Spring Boot v3.5.16 · Gradle v8.14.3 | REST API, JWT 인증, 텔레메트리 수집<br/>작물별 환경 적합도 점수 계산<br/>토양 배지 추천 로직 |
-| **Hardware<br/>& IoT** | C/C++ · Arduino · Python | 센서 펌웨어 — 대기 온습도·PPFD·토양 온도·토양 수분 4종<br/>Orange Pi 엣지 서비스, 재전송 큐 |
+| **Hardware<br/>& IoT** | C/C++ · Arduino · Python | 센서 펌웨어 — 대기 온습도·조도 기본 측정<br/>구성·보정 시 PPFD·토양 온도·토양 수분 추가 측정<br/>Orange Pi 엣지 서비스, 재전송 큐 |
+| **AI Service** | Python v3.12 · FastAPI · scikit-learn | 관수 필요 여부와 분리된 관수량 추천 API<br/>모델 오류·미가용 시 백엔드 폴백 |
 | **Database** | PostgreSQL v17 · InfluxDB v2.7 · SQLite | 사용자·공간·장치·화분 등 업무 데이터<br/>센서 시계열 데이터 저장 및 조회<br/>작물별 점수 프로필과 계산 기준 |
 | **Infra** | Docker Compose v2 · Nginx v1.27 · Node.js v24 | 개발·배포 스택 일괄 실행<br/>정적 번들 서빙 및 API 프록시 |
 | **AI<br/>Coding Tools** | GitHub Copilot · ChatGPT Codex<br/>Claude · Gemini · v0.dev | 코드 리뷰, 예외 처리 및 보안 점검<br/>설계 문서·API 명세 작성 보조<br/>API 구현, DB 스키마 및 인프라 설정 생성<br/>UI 컴포넌트 프로토타이핑 |
@@ -125,14 +135,16 @@ flowchart TD
 
 ```mermaid
 sequenceDiagram
-    participant Device as 센서 장치
+    participant Device as Arduino 센서 장치
+    participant Edge as Orange Pi 게이트웨이
     participant Broker as Mosquitto MQTT Broker
     participant API as Spring Boot API
     participant Influx as InfluxDB
     participant Web as Expo Web
     participant User as 사용자
 
-    Device->>Broker: 환경 측정 데이터 발행 (MQTT)
+    Device->>Edge: 환경 측정 데이터 전송 (Serial JSON Lines)
+    Edge->>Broker: 환경 측정 데이터 발행 (MQTT)
     Broker->>API: 텔레메트리 구독 전달
     API->>Influx: 시계열 데이터 저장
     User->>Web: 대시보드 접속
@@ -162,7 +174,7 @@ sequenceDiagram
 
 #### `실시간 환경 대시보드`
 
-- 온도, 습도, 광량(PPFD), 토양 수분의 최신 측정값을 표시합니다.
+- 온도, 습도, 조도의 최신 측정값과 구성·보정된 PPFD·토양 센서값을 표시합니다.
 - 측정 이력을 조회하여 환경 변화를 확인합니다.
 - 센서 데이터가 없는 항목은 임의의 0이 아니라 값이 없는 상태로 처리합니다.
 <br/>
@@ -177,6 +189,18 @@ sequenceDiagram
 #### `토양 추천`
 
 - 장치 또는 화분에 연결된 환경 정보를 기준으로 토양 추천 정보를 조회합니다.
+<br/>
+
+#### `맞춤 관리 가이드`
+
+- 환경 적합도, 최근 측정값, 토양 추천 및 상품 정보를 바탕으로 관리 우선순위와 실행 항목을 제공합니다.
+<br/>
+
+#### `관수 요청 및 관수량 추천`
+
+- 수동 관수 요청은 쿨다운·일일 한도 등의 안전 게이트를 거쳐 승인 또는 거부됩니다.
+- AI 서버는 관수 필요 여부를 판단하지 않고 권장 관수량만 제안하며, 사용할 수 없을 때는 백엔드가 폴백 값을 적용합니다.
+- 화분별 관수 결정 이력을 조회할 수 있습니다.
 <br/>
 
 #### `상품 구매 및 결제`
@@ -204,11 +228,15 @@ sequenceDiagram
 | S13 | 상품 및 장바구니 | 상품 카탈로그 조회와 장바구니 상품 추가·수정·삭제 |
 | S14 | 주문 및 결제 | 주문 생성·조회·취소와 토스페이먼츠 테스트 결제·취소 |
 | S15 | 상거래 관리자 API | 상품·재고 관리와 주문 상태 변경 |
+| S16 | 맞춤 관리 가이드 | 환경 분석 결과를 바탕으로 관리 우선순위·실행 항목·추천 상품 제공; AI 미설정 시 기본 가이드 표시 |
+| S17 | 관수 요청 및 이력 | 안전 게이트를 거치는 수동 관수 요청과 화분별 관수 결정 이력 조회 |
+| S18 | AI 관수량 추천 | FastAPI 서버가 권장 관수량을 제안하고, 오류·미가용 시 백엔드가 폴백 적용 |
 <br/>
 
 ### 3.4. 디렉토리 구조
 
 ```text
+├── ai-server/                # FastAPI 관수량 추천 API, 모델, 학습·테스트 도구
 ├── backend/                  # Spring Boot API, DB 마이그레이션, 자동 테스트
 │   ├── db/                   # SQLite 스키마와 마이그레이션
 │   ├── gradle/               # Gradle Wrapper
@@ -241,7 +269,7 @@ sequenceDiagram
 
 ## 4. 설치 및 사용 방법
 
-Docker를 사용하면 Java, Gradle, Node.js, PostgreSQL, InfluxDB를 호스트에 별도로 설치하지 않아도 됩니다. Docker Compose v2와 Buildx가 필요합니다.
+Docker를 사용하면 Java, Gradle, Node.js, Python, PostgreSQL, InfluxDB를 호스트에 별도로 설치하지 않아도 됩니다. Docker Compose v2와 Buildx가 필요합니다.
 
 ### 4.1. Docker 설치
 
@@ -569,7 +597,7 @@ systemctl start terrabyte-edge
 | [<img src="https://github.com/cnvxlns.png?size=160" width="120" alt="김동현 프로필 사진" />](https://github.com/cnvxlns) | [<img src="https://github.com/oesmln.png?size=160" width="120" alt="김민서 프로필 사진" />](https://github.com/oesmln) | [<img src="https://github.com/iris11132-max.png?size=160" width="120" alt="김효빈 프로필 사진" />](https://github.com/iris11132-max) | [<img src="https://github.com/7hyunii.png?size=160" width="120" alt="문성현 프로필 사진" />](https://github.com/7hyunii) | [<img src="https://github.com/Reighnex.png?size=160" width="120" alt="박태훈 프로필 사진" />](https://github.com/Reighnex) |
 | 김동현 | 김민서 | 김효빈 | 문성현 | 박태훈 |
 | okmac03@pusan.ac.kr | kmmlns@gmail.com | irisrla@naver.com | 7sonicx@gmail.com | pth4241@pusan.ac.kr |
-| 하드웨어 연동,<br/>백엔드 개발 | 풀스택 개발 | - | 풀스택 개발,<br/>개발 협업 프로세스 구축·관리 | - |
+| 하드웨어 연동,<br/>백엔드 개발 | 풀스택 개발 | 재배환경 데이터 기획,<br/>서비스 디자인 | 풀스택 개발,<br/>개발 협업 프로세스 구축·관리 | - |
 <br/>
 
 ## 7. 해커톤 참여 후기
@@ -581,7 +609,7 @@ systemctl start terrabyte-edge
 > 추후 작성 예정
 
 - 김효빈
-> 추후 작성 예정
+> 서로 다른 전공을 가진 분들과 소통하고 협업하는 경험이 처음이라 더욱 뜻깊었습니다. 이번 해커톤을 통해 하나의 프로젝트가 다양한 의견과 아이디어를 바탕으로 점차 구체화되고 완성되어 가는 과정을 직접 경험할 수 있었습니다. 특히 여러 사람의 아이디어가 모여 하나의 결과물로 이어지는 과정이 인상 깊었고, 협업의 중요성을 느낄 수 있었습니다.  특히 실제 사용자의 관점에서 서비스를 바라보며, 작은 수정이 전체적인 사용성과 완성도를 높일 수 있다는 점을 배웠습니다. 기획과 디자인, 협업 과정 등 다양한 부분을 경험하며 여러 방면에서 성장할 수 있었던 좋은 기회였습니다. 언제나 이끌어주신 팀원분들께 감사드립니다! 
 
 - 문성현
 > 추후 작성 예정
