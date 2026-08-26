@@ -7,6 +7,11 @@
 frontend/
 └─ app/                         # Expo React Native 앱 루트
   ├─ App.tsx                    # 앱 전체 흐름을 묶는 최상위 컴포넌트
+  ├─ index.ts                   # 앱 진입점
+  ├─ app.config.ts              # Firebase 설정을 연결하는 동적 Expo 설정
+  ├─ app.json                   # Expo 기본 설정
+  ├─ eas.json                   # EAS Android APK 빌드 프로필
+  ├─ assets/                    # 앱 아이콘·이미지 등 정적 에셋
   ├─ src/                       # 실제 화면과 기능 코드
     ├─ appTheme/                # 색상, 글꼴, 스타일 토큰
     ├─ analysis/                # 작물 대체 추천 API
@@ -25,6 +30,7 @@ frontend/
     ├─ payment/                 # 토스 결제 처리
     ├─ pot/                     # 화분 조회 API
     ├─ screens/                 # 실제 서비스 화면
+    ├─ sensor/                  # 기기별 센서 상태 API
     ├─ shared/                  # 공용 훅/가공 로직
     ├─ shop/                    # 상품 목록 API
     ├─ space/                   # 재배 공간 API
