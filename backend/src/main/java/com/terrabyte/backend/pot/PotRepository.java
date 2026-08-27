@@ -19,7 +19,8 @@ public class PotRepository {
 
     private static final String SELECT_COLUMNS = """
             SELECT p.id, p.device_id, p.node_id, p.label, p.crop_code, p.crop_selected_at,
-                   p.status, p.last_seen_at, p.created_at, p.substrate_volume_ml
+                   p.status, p.last_seen_at, p.created_at, p.substrate_volume_ml,
+                   p.auto_control_enabled
             FROM pot p
             """;
 
@@ -79,6 +80,43 @@ public class PotRepository {
     public List<Pot> findAllByDevice(long deviceId) {
         return jdbcTemplate.query(
                 SELECT_COLUMNS + " WHERE p.device_id = ? ORDER BY p.id", this::mapPot, deviceId);
+    }
+
+    /**
+     * Every pot the rule engine is allowed to act on this pass.
+     *
+     * <p>Four conditions, and each one removes a pot the engine could only be
+     * wrong about: no crop means no thresholds to compare against, an offline
+     * pot or gateway means a command would expire before anything could run it,
+     * and the switch means its owner has said they will decide.
+     *
+     * <p>Pot and gateway presence are both required because they go stale
+     * independently. A pot is marked online when telemetry arrives; a gateway is
+     * marked offline by its MQTT Last Will. A gateway that drops therefore
+     * leaves its pots reading ONLINE from the last sample they sent, and
+     * commanding through it publishes into nothing — the command then expires
+     * charging its granted volume to the pot's daily budget, subtracting water
+     * for a dose that was never delivered.
+     *
+     * <p>Filtered here rather than in the engine so a deployment with a thousand
+     * pots does not load them all into memory to discard most of them.
+     */
+    public List<Pot> findAllUnderAutomaticControl() {
+        return jdbcTemplate.query(
+                SELECT_COLUMNS
+                        + " JOIN device d ON d.id = p.device_id"
+                        + " WHERE p.auto_control_enabled = TRUE"
+                        + "   AND p.crop_code IS NOT NULL"
+                        + "   AND p.status = 'ONLINE'"
+                        + "   AND d.status = 'ONLINE'"
+                        + " ORDER BY p.id",
+                this::mapPot);
+    }
+
+    /** @return true when the row existed and now holds this value. */
+    public boolean setAutoControl(long potId, boolean enabled) {
+        return jdbcTemplate.update(
+                "UPDATE pot SET auto_control_enabled = ? WHERE id = ?", enabled, potId) > 0;
     }
 
     public boolean existsCropByUser(long userId) {
@@ -144,6 +182,7 @@ public class PotRepository {
                 DeviceStatus.valueOf(resultSet.getString("status")),
                 lastSeenAt == null ? null : lastSeenAt.toInstant(),
                 resultSet.getTimestamp("created_at").toInstant(),
-                readNullableInt(resultSet, "substrate_volume_ml"));
+                readNullableInt(resultSet, "substrate_volume_ml"),
+                resultSet.getBoolean("auto_control_enabled"));
     }
 }
