@@ -68,18 +68,24 @@ export function DashboardScreen({
     let active = true;
     setKitSensorsLoading(true);
     setKitSensorsError(null);
-    void getDeviceSensors(device.id)
-      .then((response) => {
-        if (active) setKitSensors(response.sensors);
-      })
-      .catch((error) => {
+    const loadSensors = async () => {
+      try {
+        const response = await getDeviceSensors(device.id);
+        if (active) {
+          setKitSensors(response.sensors);
+          setKitSensorsError(null);
+        }
+      } catch (error) {
         if (active) setKitSensorsError(error instanceof Error ? error.message : '키트 상태를 불러오지 못했습니다.');
-      })
-      .finally(() => {
+      } finally {
         if (active) setKitSensorsLoading(false);
-      });
+      }
+    };
+    void loadSensors();
+    const interval = setInterval(() => void loadSensors(), 3000);
     return () => {
       active = false;
+      clearInterval(interval);
     };
   }, [device?.id]);
 
